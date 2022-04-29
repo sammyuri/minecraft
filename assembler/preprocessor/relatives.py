@@ -1,11 +1,16 @@
 from ..formats import Instruction
 import numpy
 
-RELATIVE_LABEL_PREFIX = ".assemblerRelativeLabel"
+relativeLabelPrefix = ".assemblerRelativeLabel"
 # if original assembly program has labels that start with this string, it may break
 
 def parse_relatives(lines: list[Instruction]) -> list[Instruction]:
     """find all of the relative addresses and replace them with labels"""
+
+    for line in lines: # scan through program to see if it contains the default relative label prefix.
+        if line.is_label():
+            if line.text[0:len(relativeLabelPrefix)] == relativeLabelPrefix:
+                relativeLabelPrefix = line.text # if it does, set the prefix to it. That will ensure that the the labels are all unique.
     
     resultLines = []
     newLabels = []
@@ -22,7 +27,7 @@ def parse_relatives(lines: list[Instruction]) -> list[Instruction]:
                         j += dir
                     else:
                         i += dir
-                label = RELATIVE_LABEL_PREFIX + str(len(newLabels)) # generate a unique name for the new label
+                label = relativeLabelPrefix + str(len(newLabels)) # generate a unique name for the new label
                 newLabels.append(Instruction(label, index + i + j)) # save new label to insert later so this loop doesn't get messed up
                 newOperands.append(label) # replace relative operand with label 
             else:
