@@ -12,14 +12,14 @@ def preprocess(lines: list[Instruction]) -> list[Instruction]:
     """
     Preprocess a list of instructions
 
-    Removes comments and empty lines, applies macros, splits into pages of 64
-    instructions, parses labels, and parses relatives, resulting in a list of assembly
-    instructions only.
+    Removes comments and empty lines, applies macros, replaces relatives with labels,
+    splits into pages of 64 instructions, and parses labels,
+    resulting in a list of assembly instructions only.
     """
 
     lines = remove_comments(lines)
     lines = apply_macros(lines)
+    lines = parse_relatives(lines)
     lines = parse_pages(lines)
     lines = parse_labels(lines)
-    lines = parse_relatives(lines)
     return lines
