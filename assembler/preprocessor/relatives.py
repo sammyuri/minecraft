@@ -1,11 +1,12 @@
 from ..formats import Instruction
 import numpy
 
-relativeLabelPrefix = ".assemblerRelativeLabel"
-# if original assembly program has labels that start with this string, it may break
 
 def parse_relatives(lines: list[Instruction]) -> list[Instruction]:
     """find all of the relative addresses and replace them with labels"""
+
+    relativeLabelPrefix = ".assemblerRelativeLabel"
+    # if original assembly program has labels that start with this string, it may break
 
     for line in lines: # scan through program to see if it contains the default relative label prefix.
         if line.is_label():
