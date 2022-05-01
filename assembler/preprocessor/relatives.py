@@ -6,12 +6,11 @@ def parse_relatives(lines: list[Instruction]) -> list[Instruction]:
     """find all of the relative addresses and replace them with labels"""
 
     relativeLabelPrefix = ".assemblerRelativeLabel"
-    # if original assembly program has labels that start with this string, it may break
 
     for line in lines: # scan through program to see if it contains the default relative label prefix.
         if line.is_label():
             if line.text[0:len(relativeLabelPrefix)] == relativeLabelPrefix:
-                relativeLabelPrefix = line.text # if it does, set the prefix to it. That will ensure that the the labels are all unique.
+                relativeLabelPrefix = line.text # if it does, set the prefix to it. That will ensure that the labels are all unique.
     
     resultLines = []
     newLabels = []
