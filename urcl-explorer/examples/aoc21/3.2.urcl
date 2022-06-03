@@ -1,0 +1,108 @@
+BITS == 32
+MINHEAP 2000
+MINREG 16
+@define input #0
+@define matches #1000
+@define len r16
+@define half r15
+@define clen r14
+@define val r13
+@define width r12
+@define bit r11
+@define flip r10
+@define i r9
+@define j r8
+@define count r7
+@define o2 r6
+@define co2 r5
+@define return r4
+
+IMM val 0
+IMM width 0
+IMM len 0
+.read_loop
+    IN r1 %TEXT
+    BRE .0 r1 '0'
+    BRE .1 r1 '1'
+    BRE .le r1 '\n'
+    BNZ .read_loop r1
+    JMP .read_end
+    .0
+        LSH val val
+        INC bit bit
+        JMP .read_loop
+    .1
+        LSH val val
+        INC val val
+        INC bit bit
+        JMP .read_loop
+    .le
+        LSTR input len val
+        MOV width bit
+        INC len len
+        IMM bit 0
+        IMM val 0
+    JMP .read_loop
+.read_end
+
+IMM flip 0
+CAL .fn
+MOV o2 return
+IMM flip 1
+CAL .fn
+MOV co2 return
+
+MLT r1 o2 co2
+OUT %NUMB r1
+OUT %TEXT 'e'
+HLT
+
+
+.fn
+    IMM i 0 
+    .copy_loop
+        LLOD r1 input i
+        LSTR matches i r1
+        INC i i
+        BRL .copy_loop i len
+
+    MOV bit width
+    MOV clen len
+    .bit_loop
+        DEC bit bit
+        INC half clen
+        RSH half half
+        
+        IMM count 0
+        IMM i 0
+        .count_loop
+            LLOD r1 matches i
+            BSR r1 r1 bit
+            AND r1 r1 1
+            ADD count count r1
+            INC i i
+            BRL .count_loop i clen
+
+        IMM r1 0
+        SETGE r1 count half
+        AND count r1 1
+        XOR count count flip
+
+        IMM i 0
+        IMM j 0
+        .filter_loop
+            LLOD r1 matches i
+            BSR r2 r1 bit
+            AND r2 r2 1
+            BNE .skip r2 count
+                LSTR matches j r1
+                INC j j
+            .skip
+            INC i i
+            BRL .filter_loop i clen
+        MOV clen j
+        BLE .end clen 1
+        BNZ .bit_loop bit
+    .end
+    LLOD return matches 0
+    RET

@@ -1,0 +1,3 @@
+[submodule "URCLpp-compiler"]
+	path = URCLpp-compiler
+	url = https://github.com/Kuggo/URCLpp-compiler.git

@@ -1,0 +1,16 @@
+BITS >= 8
+OUTS 1
+OPS 3
+REG 4
+
+POP R2
+POP R3
+LOD $4 $2
+SUB $4 $4 $3
+JMP ~+3 $4
+IMM $1 -1
+RET
+ADD $4 $2 $3
+INC $4 $4
+LOD $1 $4
+RET

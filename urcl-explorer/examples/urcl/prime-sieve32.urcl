@@ -1,0 +1,40 @@
+BITS == 32
+
+MINHEAP 500_000
+@define max_prime 1_000_000
+@define n r8
+@define i r7
+@define a r6
+
+// not_prime: List[bool] = [False] * 500_000
+
+// print(2)
+OUT %NUMB 2
+OUT %TEXT '\n'
+
+// for n in range(3, max_prime, 2):
+IMM n 3
+.loop
+    // if not_prime[n >> 1]:
+    RSH r1 n
+    LOD r1 r1
+        // continue
+    BNZ .not_prime r1
+
+    // print(n)
+    OUT %NUMB n
+    OUT %TEXT '\n'
+    // for i in range(n*3, 1_000_000, n*2):
+    LSH a n
+    ADD i n a
+    BGE .not_prime i max_prime 
+    .loop2
+        // not_prime[i >> 1] = True
+        RSH r1 i
+        STR r1 1
+        ADD i i a
+        BRL .loop2 i max_prime 
+
+    .not_prime
+    ADD n n 2
+    BRL .loop n max_prime

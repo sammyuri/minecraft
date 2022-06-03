@@ -1,0 +1,22 @@
+BITS == 16
+MINREG 8
+// count the number of times a depth measurement increases
+
+@define output r8
+@define last r4
+@define val r3
+
+IMM output 0
+IN last %NUMB
+.loop
+    IN val %NUMB
+    BLE .skip val last
+        INC output output
+    .skip
+    MOV last val
+    IN r1 %TEXT
+BNZ .loop r1
+
+OUT %NUMB output
+HLT
+

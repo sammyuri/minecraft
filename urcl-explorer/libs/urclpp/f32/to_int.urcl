@@ -1,0 +1,49 @@
+@define @in R1
+@define @out R1
+
+IMM @in 12345678.6f32
+OUT %NUMB @in
+OUT %TEXT '\n'
+cal .f32_to_int
+OUT %NUMB @out
+
+HLT
+
+.f32_to_int
+BITS >= 32
+@define @float @in
+@define @exponent R2
+@define @fraction @out
+// save variables to stack
+PSH @exponent
+// get exponent
+BSR @exponent @float 23
+AND @exponent @exponent 0xff
+SUB @exponent 150 @exponent // 127 + 23 - E
+
+BRG .end @exponent 23 
+
+
+BRN .neg @float // if float >= 0
+    AND @fraction @float 0x7fffff// lower 23 bits
+    OR  @fraction @fraction 0x800000// add 1 to fraction
+    OUT %NUMB @fraction
+    OUT %TEXT '\n'
+    BSR @fraction @fraction @exponent
+    // restore variables from the stack and return
+    POP @exponent
+    RET
+.neg // else
+    AND @fraction @float 0x7fffff// lower 23 bits
+    OR  @fraction @fraction 0x800000// add 1 to fraction
+    BSR @out @fraction @exponent
+    NEG @out @fraction
+    // restore variables from the stack and return
+    POP @exponent
+    RET
+
+.end
+    IMM @out 0
+    // restore variables from the stack and return
+    POP @exponent
+    RET

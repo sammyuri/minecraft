@@ -1,0 +1,36 @@
+BITS == 32
+MINREG 8
+@define x r8
+@define y r7
+@define dir r6
+
+IMM x 0
+IMM y 0
+.loop
+    IN r1 %TEXT
+    BRZ .hlt r1
+    BRE .dir r1 'f'
+    BRE .dir r1 'u'
+    BRE .dir r1 'n'
+    SUB r2 r1 '0'
+    BRG .loop r2 9
+    BRE .f dir 'f'
+    BRE .u dir 'u'
+    BRE .d dir 'n'
+    JMP .loop
+    .dir
+        MOV dir r1
+    JMP .loop
+    .f
+        ADD x x r2
+        JMP .loop
+    .u
+        SUB y y r2
+        JMP .loop
+    .d
+        ADD y y r2
+    JMP .loop
+.hlt
+MLT r1 x y
+OUT %NUMB r1
+HLT

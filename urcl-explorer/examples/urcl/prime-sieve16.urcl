@@ -1,0 +1,31 @@
+BITS == 16
+MINHEAP 33_000
+@define n r8
+@define i r7
+
+OUT %NUMB 2
+OUT %TEXT '\n'
+
+IMM n 3
+
+.loop
+RSH r1 n
+LOD r1 r1
+BNZ .not_prime r1
+
+OUT %NUMB n
+OUT %TEXT '\n'
+LSH i n
+BLE .not_prime i n
+.loop2
+ADD i i n
+BEV .skip i
+RSH r1 i
+STR r1 1
+.skip
+BLE .not_prime i n
+BRL .loop2 i 65534
+
+.not_prime
+ADD n n 2
+BRL .loop n 65534

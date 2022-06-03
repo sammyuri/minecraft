@@ -1,0 +1,72 @@
+BITS == 32
+
+DW [ 1 2 3 4 5 ]
+.sprite
+DW [ 0 0 1 1 1 1 0 0 ]
+DW [ 0 1 1 1 1 1 1 0 ]
+DW [ 1 1 1 1 1 1 1 1 ]
+DW [ 1 1 1 1 1 1 1 1 ]
+DW [ 1 1 1 1 1 1 1 1 ]
+DW [ 1 1 1 1 1 1 1 1 ]
+DW [ 0 1 1 1 1 1 1 0 ]
+DW [ 0 0 1 1 1 1 0 0 ]
+
+IMM R1 .sprite 
+IMM R2 8 // x
+IMM R3 1 // y
+IMM R4 1 // dir
+IN R7 %Y // screen height - ball height
+SUB R7 R7 8
+IN R8 %X // screen width
+
+
+
+.loop
+    OUT %BUFFER 0
+    OUT %BUFFER 1
+    BGE .flip R3 R7
+    BLE .flip R3 0 
+    JMP .dont_flip
+    .flip
+        NEG R4 R4
+    .dont_flip
+    ADD R3 R3 R4   
+    PSH R4
+    PSH R5
+    PSH R6
+    cal .draw_sprite8x8
+    POP R6
+    POP R5
+    POP R4
+    OUT %BUFFER 2
+    OUT %WAIT 100
+    IN R6 %WAIT
+    JMP .loop
+HLT
+
+
+// image: R1 const Bin[ 64 ]*, x: R2 const int, y: R3 const int,
+// src_x: var R4, src_y: var R5, src_i/color: var R6
+// screen_width: const R8
+.draw_sprite8x8
+    IMM R5 0
+    .loop_y
+        ADD R5 R5 R3
+        OUT %Y R5
+        SUB R5 R5 R3
+        IMM R4 0
+        .loop_x
+            ADD R4 R4 R2
+            OUT %X R4
+            SUB R4 R4 R2
+            MLT R6 R5 8
+            ADD R6 R6 R4
+            ADD R6 R6 R1
+            LOD R6 R6
+            // OUT %NUMB R6
+            OUT %COLOR R6
+            INC R4 R4
+            BLE .loop_x R4 7
+        INC R5 R5
+        BLE .loop_y R5 7
+    RET

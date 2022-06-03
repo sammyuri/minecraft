@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="./index.css">
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URCL Explorer</title>
+    <script type="module" src="js/scroll-out/scroll-out.js"></script>
+    <link rel="stylesheet" href="scroll-out/scoll-out.css">
+    <script type="module" src="js/editor/editor.js"></script>
+    <link rel="stylesheet" href="editor/editor.css">
+    <link rel="icon" type="image/png" href="img/favicon.png">
+</head>
+<body>
+    <main>
+        <div>
+            <h2>
+                URCL Source
+                <button id="share-button" style="font-size: 1em;">copy share url</button>
+            </h2>
+            <editor-window id="urcl-source"></editor-window>
+        </div>
+        <div>
+            <div>
+                <button id="compile-and-reset-button">Compile</button>
+                <button id="pause-button">Pause</button><br>
+                <button id="compile-and-run-button">Compile and run</button>
+                <button id=step-button disabled>Step</button><br>
+                clock speed Hz <input type="number" id="clock-speed-input"> <output id="clock-speed-output"></output><br>
+                auto run <input type="checkbox" id="auto-run-input" checked> <br>
+                storage-file <input id="storage-input" type="file"> <span id="storage-msg"></span><br>
+                little endian <input id="storage-little" type="checkbox"><br>
+                <button id="storage-update"">Update storage</button>
+                <button id="storage-download">Update and download storage</button>
+                <div style="display: flex;">
+                    <details open>
+                        <summary>Examples</summary>
+                        <ul>
+                            <li><a href="?srcurl=examples/urcl/add.urcl">Addition</a></li>
+                            <li><a href="?srcurl=examples/urcl/fib.urcl">Fibonacci Sequence </a></li>
+                            <li><a href="?srcurl=examples/urcl/audio.urcl">Audio Ports</a></li>
+                            <li><a href="?srcurl=examples/urcl/display-io.urcl">Display Ports</a></li>
+                            <li><a href="?srcurl=examples/urcl/gamepad.urcl">Gamepad Port</a></li>
+                            <li><a href="?srcurl=examples/urcl/sprites.urcl">Ball Sprite</a></li>
+                            <li><a href="?srcurl=examples/urcl/game.urcl">Jumping Square</a></li>
+                            <li><a href="?srcurl=examples/urcl/snake.urcl">Snake</a></li>
+                            <li><a href="?srcurl=examples/urcl/pallet-test.urcl">Pallet Test</a></li>
+                            <li><a href="?srcurl=examples/urcl/line.urcl">Drawing a Line</a></li>
+                            <li><a href="?srcurl=examples/urcl/prime-sieve16.urcl">16 bit prime sieve</a></li>
+                            <li><a href="?srcurl=examples/urcl/prime-sieve32.urcl">32 bit prime sieve</a></li>
+                            <li><a href="?srcurl=examples/urcl/debug.urcl">Debug macro</a></li>
+
+                            <!-- <li><a href="?srcurl=examples/urcl/wolfenstein.urcl">wolfenstein</a></li> -->
+                        </ul>
+                    </details>
+                    <div>
+                        <h2>Output</h2>
+                        <pre id="output"></pre>
+                        <pre id="debug-output"></pre>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <h3>registers</h3>
+                <pre id="register-view"></pre>
+            </div>
+            <div>
+                <h3>memory</h3>
+                auto update <input type="checkbox" id="update-mem-input"> <br>
+                <pre id="memory-view" style="max-height: 12vh; overflow: auto;"></pre>
+            </div>
+            <div style="display: flex; gap: 2rem;">
+                <div>
+                    <h3>Console</h3>
+                    <scroll-out id="stdout"></scroll-out>
+                    <textarea id="stdin" type="text"></textarea>
+                    <br>
+                    null terminate<input type="checkbox" id="null-terminate">
+                </div>
+                <div style="width: 100%;">
+                    color mode
+                    <select id="color-mode" value="PICO8">
+                        <option value="PICO8">PICO8</option>
+                        <option value="Mono">Mono</option>
+                        <option value="Bin">Bin</option>
+                        <option value="RGB6">RGB6</option>
+                        <option value="RGB8">RGB8</option>
+                        <option value="RGB12">RGB12</option>
+                        <option value="RGB16">RGB16</option>
+                        <option value="RGB24">RGB24</option>
+                        <option value="RGB">RGB</option>
+                        <option value="RGBI">RGBI</option>
+                    </select>
+                    <br>
+                    width <input type="number" id="display-width" value="96"><br>
+                    height <input type="number" id="display-height" value="64">
+                    <div id="pref-display"></div>
+                    <canvas style="width: 100%; display: block;" width="96" height="64"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+    <script type="module" src="js/index.js"></script>
+</body>
+</html>

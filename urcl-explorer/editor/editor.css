@@ -1,0 +1,97 @@
+editor-window {
+    display: flex;
+    font-family: "monospace";
+    font-size: 1em;
+    gap: 0.5em;
+    overflow-x: auto;
+    overflow-y: auto;
+    width: 100%;
+    height: 100%;
+    white-space: pre;
+}
+editor-window .code {
+    width: max-content;
+    min-width: calc(100% - 4em);
+    height: 100%;
+}
+editor-window .line-nrs {
+    text-align: right;
+}
+editor-window .colors, editor-window .line-nrs, editor-window textarea {
+    padding: 0.25ch;
+    margin: 0.25ch;
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: 1em;
+    line-height: 1em;
+}
+
+editor-window .colors, editor-window textarea {
+    overflow: visible;
+    border: none;
+    white-space: pre;
+}
+editor-window textarea {
+    background-color: black;
+    color: transparent;
+    caret-color: white;
+    resize: none;
+    min-width: 100%;
+    min-height: 95%;
+}
+editor-window .colors {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    pointer-events: none;
+    color: #f44747;
+    height: 100%;
+}
+
+.pc-line {
+    color: greenyellow;
+    width: max-content;
+}
+.pc-line::before {
+    content: "->";
+}
+
+.opcode, .dw, .name {
+    color: #569cd6;
+}
+.expansion, .comparator {
+    color: white;
+}
+.number {
+    color: #b5cea8;
+}
+.memory, .port {
+    color: #4ec9b0;
+}
+.quote-char, .quote-string, .text {
+    color: #ce9178;
+}
+.escape {
+    color: #d7ba7d
+}
+.register {
+    color: #9cdcfe;
+}
+.white, .white-inline {
+    text-decoration: underline dashed rgb(69, 69, 69);
+}
+.macro {
+    color: #c586c0;
+}
+.error {
+    text-decoration: underline wavy red;
+}
+.comment, .comment-multi {
+    color: #6a9955;
+}
+.label, .relative {
+    color: #dcdcaa
+}
+
+.square-open, .square-close {
+    color: white;
+}

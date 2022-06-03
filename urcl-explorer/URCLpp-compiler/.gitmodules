@@ -1,0 +1,3 @@
+[submodule "Libraries"]
+	path = Libraries
+	url = https://github.com/Urclpp/urclpp-libraries.git

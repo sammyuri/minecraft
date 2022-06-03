@@ -1,0 +1,145 @@
+@font-face {
+  font-family: "unscii";
+  src: url("unscii-16.ttf") format("ttf") url("unscii-16.woff") format("woff");
+}
+a {
+  color: lightgrey;
+}
+a:visited {
+  color: lightblue;
+}
+a:hover {
+  color: white;
+}
+
+html, body {
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  --padding: 3ch;
+  width: calc(100vw - var(--padding)*2);
+  height: calc(100vh - var(--padding)*2);
+  padding: var(--padding);
+}
+main {
+  display: flex;
+  gap: 2rem;
+  flex-grow: 1;
+  width: 100%;
+  height: 100%;
+}
+main > * {
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  height: 100%;
+  flex-basis: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+canvas {
+  background-color: black;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  border: 0.1rem solid rgb(53, 53, 53);
+}
+canvas:fullscreen {
+  border: none;
+}
+
+
+html {
+  font-family: "unscii";
+  background: #111;
+  color: #EEE;
+}
+
+textarea {
+  background-color: #444;
+  color: #FFF;
+  border: 0px;
+  font-family: "unscii";
+}
+
+#stdout {
+  height: 200px;
+  width: 200px;
+  overflow: scroll;
+  background: #000;
+  color: #FFF;
+  font-family: "unscii";
+  display: block;
+  white-space: pre;
+  resize: auto;
+}
+
+#stdin {
+  background: #444;
+  color: #fff;
+  font-family: unscii;
+  border: 0px;
+}
+
+button {
+  background: #444;
+  color: #EEE;
+  font-family: unscii;
+  width: 20%;
+  border: 0px;
+  filter: brightness(75%);
+}
+button:hover {
+  filter: brightness(85%);
+}
+button:disabled {
+  filter: brightness(40%);
+}
+button:active {
+  filter: brightness(100%);
+}
+
+input {
+  font-family: unscii;
+  background: #444;
+  color: #FFF;
+  border: 0;
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+select {
+  background-color: #444;
+  color: #EEE;
+  font-family: unscii;
+  border: 0px;
+}
+
+#compile-and-run-button {
+  background: #0D0;
+  color: #111;
+}
+
+#compile-and-reset-button {
+  background: #F00;
+  color: #111;
+}
+
+#pause-button {
+  background: #66B6FF;
+  color: #111;
+}
+
+:disabled {
+  color: #AAA;
+}

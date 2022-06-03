@@ -1,0 +1,64 @@
+BITS == 32
+MINREG 8
+@define len r8
+@define bits_end r7
+@define bit r6
+@define half r5
+@define gamma r4
+@define epsilon r3
+
+IMM bit 0
+IMM len 0
+.read_loop
+    IN r1 %TEXT
+    BRE .0 r1 '0'
+    BRE .1 r1 '1'
+    BRE .le r1 '\n'
+    BNZ .read_loop r1
+    JMP .read_end
+    .0
+        INC bit bit
+        JMP .read_loop
+    .1
+        LOD r1 bit
+        INC r1 r1
+        STR bit r1
+        INC bit bit
+        JMP .read_loop
+    .le
+        INC len len
+        ADD bits_end .bits bit 
+        IMM bit 0
+    JMP .read_loop
+.read_end
+
+IMM gamma 0
+DIV half len 2
+imm bit .bits
+.gamma_loop
+    LSH	gamma gamma
+    LOD r1 bit
+    BLE .skip r1 half
+        INC gamma gamma
+    .skip
+    INC bit bit
+    BRL .gamma_loop bit bits_end
+
+NOT epsilon gamma
+SUB r1 bits_end .bits
+BSL r1 1 r1
+DEC r1 r1
+AND epsilon epsilon r1
+
+OUT %NUMB gamma
+OUT %TEXT '\n'
+
+OUT %NUMB epsilon
+OUT %TEXT '\n'
+MLT r1 gamma epsilon
+OUT %NUMB r1
+
+HLT
+
+.bits
+DW 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0

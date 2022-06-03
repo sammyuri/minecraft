@@ -1,0 +1,60 @@
+@DEFINE key r8 // contains which buttons are down
+@DEFINE last r7 // contains which bottons where down last frame
+@DEFINE down r6 // contains which buttons went down this frame
+@DEFINE up r5 // contains which buttons went up this frame
+
+
+.loop
+MOV last key 
+IN key %GAMEPAD
+XOR down key last
+AND down down key
+
+XOR up key last
+AND up up last
+
+// the down registers contains all buttons that went down
+// so we AND it with the bit for UP to check if the UP button went down
+AND r1 down @UP // W
+BRZ .up r1
+    OUT %TEXT '^'
+.up
+
+AND r1 down @DOWN // S
+BRZ .down r1
+    OUT %TEXT 'v'
+.down
+
+AND r1 down @LEFT // A
+BRZ .left r1
+    OUT %TEXT '<'
+.left
+
+AND r1 down @RIGHT // D
+BRZ .right r1
+    OUT %TEXT '>'
+.right
+
+AND r1 down @A // K
+BRZ .A r1
+    OUT %TEXT 'A'
+.A
+
+AND r1 down @B // J
+BRZ .B r1
+    OUT %TEXT 'B'
+.B
+
+AND r1 down @START // N
+BRZ .start r1
+    OUT %TEXT '!'
+.start
+
+AND r1 down @SELECT // V
+BRZ .select r1
+    OUT %TEXT '?'
+.select
+
+OUT %WAIT 16
+IN r1 %WAIT
+JMP .loop

@@ -1,0 +1,34 @@
+// count the number of times a depth measurement increases with a sliding average of 3
+BITS == 16
+MINREG 8
+@define output r8
+@define a r7
+@define b r6
+@define c r5
+@define last r4
+@define val r3
+
+IMM output 0
+IN a %NUMB
+IN b %NUMB
+IN c %NUMB
+MOV last a
+ADD last last b
+ADD last last c
+.loop
+    MOV a b
+    MOV b c
+    IN c %NUMB
+    MOV val a
+    ADD val val b
+    ADD val val c
+    BLE .skip val last
+        INC output output
+    .skip
+    MOV last val
+    IN r1 %TEXT
+BNZ .loop r1
+
+OUT %NUMB output
+HLT
+

@@ -1,0 +1,12 @@
+BITS >= 8
+OUTS 1
+OPS 2
+REG 1
+
+LLOD $1 SP 1
+LOD $1 $1
+BNZ +3 $1
+DEC $1 $1
+RET
+IMM $1 0
+RET

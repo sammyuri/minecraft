@@ -1,0 +1,17 @@
+BITS >= 8
+OPS 0
+REG 0
+
+// hello world
+
+OUT %1 'H'
+OUT %1 'e'
+OUT %1 'l'
+OUT %1 'l'
+OUT %1 'o'
+OUT %1 ' '
+OUT %1 'W'
+OUT %1 'o'
+OUT %1 'r'
+OUT %1 'l'
+OUT %1 'd'

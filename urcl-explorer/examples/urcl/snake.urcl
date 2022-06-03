@@ -1,0 +1,194 @@
+MINHEAP 2048
+BITS == 16
+MINREG 32
+
+
+@DEFINE key r32
+@DEFINE last r31
+@DEFINE down r30
+@DEFINE dx r29
+@DEFINE dy r28
+@DEFINE x r27
+@DEFINE y r26
+@DEFINE .tail #0
+@DEFINE i r25
+@DEFINE j r24
+@DEFINE l r23
+@DEFINE score r22
+@DEFINE wait r21
+@DEFINE tailmax 2047
+@DEFINE black 0
+@DEFINE body 11
+@DEFINE tail 3
+@DEFINE apple 8
+
+.end_text
+DW [ 18 'g' 'a' 'm' 'e' '-' 'o' 'v' 'e' 'r' '\n' 's' 'c' 'o' 'r' 'e' ':' ':' ]
+
+IMM dx 0
+IMM dy 1
+IMM score 5
+IMM l 0
+IMM i 0
+IMM j 0
+IMM down 0
+
+OUT %BUFFER 1
+
+OUT %COLOR 1
+
+CAL .apple
+
+MOV r1 x
+MOV r2 y
+CAL .push
+
+OUT %BUFFER 2
+.loop
+    MOV last key
+    IN key %GAMEPAD
+    XOR r1 key last
+    AND r1 r1 key
+    OR down down r1
+
+    INC wait wait
+    BRL .skip_step wait 4
+        CAL .step
+        OUT %BUFFER 2
+        IMM wait 0
+        IMM down 0
+    .skip_step
+
+    OUT %WAIT 15
+    IN r1 %WAIT
+    JMP .loop
+
+.step
+    AND r1 down @UP // W
+    BRZ .up r1
+    BGE .up dy @SMAX
+        IMM dy -1
+        IMM dx 0 
+        JMP .input_end
+    .up
+
+    AND r1 down @DOWN // S
+    BRZ .down r1
+    BRN .down dy
+        IMM dy 1
+        IMM dx 0
+        JMP .input_end
+    .down
+
+    AND r1 down @LEFT // A
+    BRZ .left r1
+    BGE .left dx @SMAX
+        IMM dy 0
+        IMM dx -1 
+        JMP .input_end
+    .left
+
+    AND r1 down @RIGHT // D
+    BRZ .right r1
+    BRN .right dx
+        IMM dy 0
+        IMM dx 1
+    .right
+    .input_end
+
+    ADD x x dx
+    ADD y y dy
+    AND x x 31
+    AND y y 31
+    OUT %X x
+    OUT %Y y
+
+    IN r1 %COLOR
+    BRE .ok r1 black
+    BRE .eat_apple r1 apple
+        JMP .gameover
+    .eat_apple
+        ADD score score 5
+        CAL .apple
+    .ok
+
+    OUT %X x
+    OUT %Y y
+    OUT %COLOR body
+
+    CAL .peak_end
+    OUT %X r1
+    OUT %Y r2
+    OUT %COLOR tail
+
+    MOV r1 x
+    MOV r2 y
+    CAL .push
+
+    BRL .skip l score
+        CAL .shift
+        OUT %X r1
+        OUT %Y r2
+        OUT %COLOR 0
+    .skip
+    RET
+
+.gameover
+    IMM r1 .end_text
+    CAL .print
+    OUT %NUMB score
+    HLT
+
+
+.push // out r1, r2
+    LSTR .tail j r1
+    INC j j
+    LSTR .tail j r2
+    INC j j
+    AND j j tailmax
+    INC l l
+    RET
+
+.peak_end // out r1, r2
+    DEC j j
+    AND j j tailmax
+    LLOD r2 .tail j
+    DEC j j
+    LLOD r1 .tail j
+    ADD j j 2
+    AND j j tailmax
+    RET
+
+.shift // in r1, r2
+    LLOD r1 .tail i
+    INC i i
+    LLOD r2 .tail i
+    INC i i
+    AND i i tailmax
+    DEC l l
+    RET
+
+.apple
+    .apple_loop
+        IN r1 %RNG
+        AND r1 r1 31
+        OUT %X r1
+        IN r1 %RNG
+        AND r1 r1 31
+        OUT %Y r1
+        IN r1 %COLOR
+        BNE .apple_loop r1 black
+    OUT %COLOR apple
+    RET
+
+.print // in var r1 string*r, var r2, r3
+    LOD r2 r1
+    ADD r2 r2 r1
+    INC r1 r1
+.print_sub // in var r1 char* start, in const r2 char* end, var r3
+    .print_loop
+        LOD r3 r1
+        OUT %TEXT r3
+        INC r1 r1
+        BRL .print_loop r1 r2
+    RET

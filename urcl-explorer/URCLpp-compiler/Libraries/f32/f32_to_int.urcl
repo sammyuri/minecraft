@@ -1,0 +1,28 @@
+//BITS >= 32
+@define @float R1 // const
+@define @exponent R2 // var
+@define @fraction R3 // out
+
+POP @float
+
+// get exponent
+BSR @exponent @float 23
+AND @exponent @exponent 0xff
+SUB @exponent 150 @exponent // 127 + 23 - E
+
+BGE .return_0 @exponent 23 
+
+// get fraction
+AND @fraction @float 0x7fffff // lower 23 bits
+OR  @fraction @fraction 0x800000 // add 1 to fraction
+
+BSR @fraction @fraction @exponent
+BRP .pos @float
+NEG @fraction @fraction
+.pos
+PSH @fraction
+RET
+
+.return_0
+PSH 0
+RET

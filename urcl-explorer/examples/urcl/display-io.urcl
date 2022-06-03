@@ -1,0 +1,38 @@
+BITS == 32
+
+IN r2 %X
+IMM r3 0
+IN r4 %Y
+OUT %BUFFER 1
+.y_loop
+    OUT %Y r3
+    IMM r1 0
+    .x_loop
+        OUT %X r1
+        OUT %COLOR r1
+        INC r1 r1
+        BRL .x_loop r1 r2
+    INC r3 r3
+    BRL .y_loop r3 r4
+IMM r1 0
+IMM r3 0
+.loop1
+    OUT %X r1
+    OUT %Y r3
+    OUT %COLOR 0
+    INC r1 r1
+    INC r3 r3
+    BRL .loop1 r1 r2  
+
+IMM r1 0
+IN r3 %Y
+DEC r3 r3
+.loop2
+    OUT %X r1
+    OUT %Y r3
+    OUT %COLOR 7
+    INC r1 r1
+    DEC r3 r3
+    BRL .loop2 r1 r2
+
+OUT %BUFFER 2

@@ -1,0 +1,107 @@
+MINREG 16
+@DEFINE key r16
+@DEFINE last r15
+@DEFINE down r14
+@DEFINE up r13
+@DEFINE x r12
+@DEFINE xl r11
+@DEFINE y r10
+@DEFINE yl r9
+@DEFINE vx r8
+@DEFINE vy r7
+@DEFINE vh r6
+@DEFINE speed 100
+@DEFINE jump -128
+@DEFINE g 4
+
+OUT %BUFFER 1
+.loop
+MOV last key
+IN key %GAMEPAD
+XOR down key last
+AND down down key
+
+XOR up key last
+AND up up last
+
+BRN .skip_skip vy
+BGE .skip_g vy 117
+.skip_skip
+    ADD vy vy g
+.skip_g
+
+BRN .skip_stop vy
+BNE .skip_stop y 31
+    IMM vy 0
+.skip_stop
+
+AND r1 down @UP // W
+BRZ .up r1
+    IMM vy jump
+.up
+
+AND r1 down @DOWN // S
+BRZ .down r1
+    OUT %TEXT 'v'
+.down
+
+IMM vx 0
+AND r1 key @LEFT // A
+BRZ .left r1
+    NEG vx speed
+.left
+
+AND r1 key @RIGHT // D
+BRZ .right r1
+    IMM vx speed
+.right
+
+AND r1 down @A // K
+BRZ .A r1
+    OUT %TEXT 'A'
+.A
+
+AND r1 down @B // J
+BRZ .B r1
+    OUT %TEXT 'B'
+.B
+
+AND r1 down @START // N
+BRZ .start r1
+    OUT %TEXT '!'
+.start
+
+AND r1 down @SELECT // V
+BRZ .select r1
+    OUT %TEXT '?'
+.select
+
+// add signed x velocity to x
+BNC .skip xl vx
+    INC x x
+.skip
+BRP .negx vx
+    ADD x x @MAX
+.negx
+ADD xl xl vx
+
+// add signed y velocity to y
+BNC .skip2 yl vy
+    INC y y
+.skip2
+BRP .negy vy
+    ADD y y @MAX
+.negy
+ADD yl yl vy
+
+OUT %X x
+OUT %Y y
+OUT %COLOR 0xff
+
+OUT %BUFFER 2
+OUT %BUFFER 0
+OUT %BUFFER 1
+
+OUT %WAIT 16
+IN r1 %WAIT
+JMP .loop

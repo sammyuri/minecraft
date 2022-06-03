@@ -1,0 +1,3 @@
+This Library was provided by Verlio_H
+Updates and fixes to the original code were done to adapt it to library file format by Kuggo
+This Version of the complex library is the half half version. 1 reg contains both the imaginary and real part of the number in the upper half and lower half of the word. 

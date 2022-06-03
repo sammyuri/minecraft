@@ -1,0 +1,116 @@
+BITS == 16
+@DEFINE d16 100 // 16th note
+@DEFINE d8 200 // 8th note
+@DEFINE d4 400 // quarter note
+@DEFINE d2 800 // half note
+@DEFINE df 1600 // full note
+@DEFINE d3_8 600 // 3/8th note
+@DEFINE d6 267 // triplet
+@DEFINE fs 0
+@DEFINE g 1
+@DEFINE gs 2
+@DEFINE a 3
+@DEFINE as 4
+@DEFINE b 5
+@DEFINE c 6
+@DEFINE cs 7
+@DEFINE d 8
+@DEFINE ds 9
+@DEFINE e 10
+@DEFINE f 11
+
+@DEFINE fs1 12
+@DEFINE g1 13
+@DEFINE gs1 14
+@DEFINE a1 15
+@DEFINE as1 16
+@DEFINE b1 17
+@DEFINE c1 18
+@DEFINE d1 19
+@DEFINE ds1 20
+@DEFINE e1 21
+@DEFINE f1 22
+@DEFINE a2 23
+@DEFINE as2 24
+@DEFINE b2 25
+@DEFINE c2 26
+@DEFINE len r8
+@DEFINE i r7
+
+.bar0
+DW [ e1 d8    e1 d8    0 d8    e1 d8   0 d8    c1 d8   c1 d4 ]
+.bar1
+DW [ g1 d4    0 d4    g d4    0 d4 ]
+.bar2
+DW [ c1 d4    0 d8    g d4    0 d8    e d4 ]
+.bar3
+DW [ 0 d4     a1 d4   b1 d4   as1 d8  a1 d4 ]
+.bar4
+DW [ g d6     e1 d6   g1 d6   a2 d4   f1 d8   g1 d8 ] 
+.bar5
+DW [ 0 d8     e1 d4   c1 d8   d1 d8   b1 d4   0 d8 ] // play from bar 2 again
+.bar6
+DW [ 0 d4     g1 d8   fs1 d8  ds1 d8  e1 d8 ]
+.bar7
+DW [ gs d8    a1 d8   c1 d8   0 d8    a1 d8   c1 d8   d1 d8 ] 
+.bar8
+DW [ 0 d4     g1 d8   fs1 d8  ds1 d4  e1 d8 ]
+.bar9
+DW [ 0 d8     c2 d4   c2 d8   c2 d4   0 d8 ]
+.bar10
+DW [ 0 d4     g1 d8   fs1 d8  ds1 d4  e1 d8 ]
+.bar11
+DW [ 0 d8     gs d8   a1 d8   c1 d8   0 d8    a1 d8   c1 d8   d1 d8 ]
+.bar12
+DW [ 0 d4     ds1 d4  0 d8    d1 d4   0 d8 ]
+.bar13
+DW [ c1 d4    0 d2    0 d4 ]
+.bar14
+DW [ c1 d8    c1 d8   0 d8    c1 d8   0 d8    c1 d8   d1 d4 ]
+.end
+DW
+
+IMM i .bar0
+.loop
+    LOD r1 i
+    INC i i
+    LOD len i
+    INC i i
+    OUT %NUMB r1
+    OUT %TEXT ' '
+    OUT %NUMB len
+    OUT %TEXT '\n'
+    BRZ .br_wait r1
+        OUT %NOTE r1
+        CAL .play
+        JMP .br_note
+    .br_wait
+        // BRZ .br_loop len len
+        CAL .wait
+        JMP .br_note
+        // .br_loop
+        // LOD r1 i
+        // BRE
+        // DEC r1 r1
+        // STR i r1
+        
+        // INC i
+        // LOD r2 i
+        // INC i
+        
+    .br_note
+    BRL .loop i .end
+OUT %TEXT 'H' 
+HLT
+
+.play
+    SUB r1 len 20
+    OUT %NLEG r1
+    OUT %WAIT len
+    IN r0 %WAIT
+    RET
+
+.wait
+    OUT %WAIT len
+    IN r0 %WAIT
+    RET

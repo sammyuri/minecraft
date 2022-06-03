@@ -1,0 +1,23 @@
+IMPORT String
+@define @var R1
+ADD R1 R2
+INC @var
+LCAL String.print('e')
+IN R1 101
+LCAL String.char_at(R2 .label 2)
+DW "Hello World"
+DEC SP
+IF R1 == 1
+  ADD R1 R1 R1
+  IF R1 == 2
+    INC @var
+  ELIF R1 == 3
+    DEC @var
+  END
+ELSE
+  ADD R2 R2
+END
+
+WHILE R1
+INC R1
+END

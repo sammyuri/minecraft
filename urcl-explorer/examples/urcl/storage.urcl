@@ -1,0 +1,23 @@
+.string
+DW 1
+DW 2
+DW 3
+DW 4
+DW 5
+DW 6
+DW 7
+DW 8
+DW 9
+DW 10
+DW 11
+DW 12
+DW 13
+DW 0
+
+DEC r1 .string
+.loop
+    INC r1 r1
+    LOD r2 r1
+    OUT %ADDR r1
+    OUT %BUS r2
+    BNZ .loop r2

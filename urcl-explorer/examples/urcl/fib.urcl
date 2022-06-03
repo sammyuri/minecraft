@@ -1,0 +1,18 @@
+IMM $2 1
+IMM $3 1
+
+OUT %NUMB $2
+OUT %TEXT '\n'
+OUT %NUMB $3
+OUT %TEXT '\n'
+.loop
+    ADD $2 $2 $3
+    OUT %NUMB $2
+    OUT %TEXT '\n'
+    BRC .stop $2 $3
+    ADD $3 $2 $3
+    OUT %NUMB $3
+    OUT %TEXT '\n'
+    BNC .loop $2 $3
+.stop
+HLT

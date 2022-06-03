@@ -1,0 +1,3 @@
+This Library was provided by Verlio_H
+Updates and fixes to the original code were done to adapt it to library file format by Kuggo
+This Version of the complex library is the word word version. 2 regs make up the imaginary and real part of the numbers

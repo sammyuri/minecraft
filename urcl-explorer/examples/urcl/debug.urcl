@@ -1,0 +1,34 @@
+@DEBUG r1
+@DEBUG ONREAD r2
+@DEBUG ONWRITE r3
+@DEBUG #0
+@DEBUG .array
+@DEBUG ONWRITE .array+1
+@DEBUG ONWRITE .array+2
+
+@DEBUG ONWRITE %NUMB
+@DEBUG %TEXT
+
+IMM r1 10
+IMM r2 r1
+IMM r3 r2
+IMM r2 #0
+STR #0 r2
+STR .array 5
+LOD r3 .array
+LLOD r1 .array 1
+LSTR .array 1 11
+LSTR .array 2 12
+LLOD .array 3 13
+
+@DEBUG
+OUT %NUMB '0'
+OUT %TEXT 'h'
+OUT %TEXT 'e'
+OUT %TEXT 'l'
+OUT %TEXT 'l'
+OUT %TEXT 'o'
+
+DW
+.array
+DW [ 0 1 2 3 4 ]

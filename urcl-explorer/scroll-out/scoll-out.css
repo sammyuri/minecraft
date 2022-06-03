@@ -1,0 +1,17 @@
+scroll-out {
+    display: block;
+    overflow: scroll;
+    white-space: pre;
+    width: 40ch;
+    height: 40ch;
+    font-family: monospace;
+}
+
+scroll-out :first-child {
+    position: relative;
+    width: 0px;
+    height: 0px;
+}
+scroll-out :first-child * {
+    position: absolute;
+}

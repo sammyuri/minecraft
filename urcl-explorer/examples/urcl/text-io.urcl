@@ -1,0 +1,54 @@
+BITS == 8
+MINREG 8
+MINHEAP 16
+RUN ROM
+MINSTACK 8
+
+OUT %TEXT 'W'
+OUT %TEXT 'h'
+OUT %TEXT 'o'
+OUT %TEXT ' '
+OUT %TEXT 'a'
+OUT %TEXT 'r'
+OUT %TEXT 'e'
+OUT %TEXT ' '
+OUT %TEXT 'y'
+OUT %TEXT 'o'
+OUT %TEXT 'u'
+OUT %TEXT '?'
+OUT %TEXT ':'
+OUT %TEXT ' '
+
+    
+IMM $1 #0
+CAL .text_in
+OUT %TEXT '\n'
+OUT %TEXT 'H'
+OUT %TEXT 'e'
+OUT %TEXT 'l'
+OUT %TEXT 'l'
+OUT %TEXT 'o'
+OUT %TEXT ' '
+IMM $1 #0
+CAL .text_out
+HLT
+
+.text_in // start: in $1 char*, ch: $2 var
+    IN $2 %TEXT
+    BRE .text_in_end $2 '\n'
+    STR $1 $2
+    INC $1 $1
+    JMP .text_in
+    .text_in_end
+    STR $1 0
+    RET
+.text_out // start: in $1 char*, ch: $2 var
+    LOD $2 $1
+    BRE .text_out_end $2 0
+    OUT %TEXT $2
+    INC $1 $1
+    JMP .text_out
+    .text_out_end
+    RET
+
+    
