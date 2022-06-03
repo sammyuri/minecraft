@@ -1,6 +1,6 @@
 import { IO_Port } from "../../instructions.js";
 import { Vertex, Texture } from "./amogus.js";
-export class BlockToMesh {
+export class MeshGen {
     constructor(blockRam, amogus) {
         this.block = {
             x: 0,

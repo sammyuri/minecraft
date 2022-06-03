@@ -3,7 +3,7 @@ import { IO_Port } from "../../instructions.js";
 import { BlockRAM } from "./blockRAM.js";
 import { Amogus, Vertex, Texture } from "./amogus.js";
 
-export class BlockToMesh implements Device {
+export class MeshGen implements Device {
     blockRAM:BlockRAM;
     amogus:Amogus;
     constructor(blockRam:BlockRAM, amogus:Amogus) {

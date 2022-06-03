@@ -17,7 +17,7 @@ import { Scroll_Out } from "./scroll-out/scroll-out.js";
 import { CraftingRom } from "./emulator/devices/CHUNGUS devices/craftingRom.js";
 import { PlayerInput } from "./emulator/devices/CHUNGUS devices/playerInput.js";
 import { BlockRAM } from "./emulator/devices/CHUNGUS devices/blockRAM.js";
-import { BlockToMesh } from "./emulator/devices/CHUNGUS devices/blockToMesh.js";
+import { MeshGen } from "./emulator/devices/CHUNGUS devices/blockToMesh.js";
 import { Amogus } from "./emulator/devices/CHUNGUS devices/amogus.js";
 
 let animation_frame: number | undefined;
@@ -207,7 +207,7 @@ const blockRAM = new BlockRAM();
 emulator.add_io_device(blockRAM);
 const amogus = new Amogus(display);
 emulator.add_io_device(amogus);
-emulator.add_io_device(new BlockToMesh(blockRAM, amogus));
+emulator.add_io_device(new MeshGen(blockRAM, amogus));
 
 source_input.oninput = oninput;
 auto_run_input.onchange = oninput;
