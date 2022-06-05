@@ -4,6 +4,8 @@ from .peripherals.trianglerom import TriangleROM, DirectionROM
 
 from .emulator import CPUError
 
+from enum import Enum
+
 
 class Ports:
     """IO ports for the CHUNGUS2"""
@@ -32,3 +34,43 @@ class Ports:
     def port_store(self, port: int, value: int) -> None:
         """Output to a peripheral"""
         self.ports[port].receive(value, port)
+
+
+class IO_Port(Enum):
+    CRAFTROM = 0
+
+    RNG = 1
+
+    PI1 = 2
+    PI2 = 3
+
+    BLOCKRAM_XY = 4
+    BLOCKRAM_ZI = 5
+    BLOCKRAM_ID = 6
+    BLOCKRAM_ZI_SET = 7
+
+    MESHGEN_BLOCKXY = 8
+    MESHGEN_BLOCKZ = 9
+    MESHGEN_BREAKPHASE = 10
+    MESHGEN_ITEMXZ = 11
+    MESHGEN_ITEMY = 12; MESHGEN_RENDERFACE = 12
+    MESHGEN_ITEMID = 13; MESHGEN_RENDERITEM = 13
+    MESHGEN_TEX = 14; MESHGEN_RENDEROVERLAY = 14
+    MESHGEN_SETTINGS = 15; MESHGEN_RENDERSCENE = 15
+
+    AMOGUS_CAMX = 16
+    AMOGUS_CAMY = 17
+    AMOGUS_CAMZ = 18
+    AMOGUS_CAMROT = 19
+    AMOGUS_VERTX = 20
+    AMOGUS_VERTY = 21
+    AMOGUS_VERTZ = 22
+    AMOGUS_VERTUV = 23; AMOGUS_PLRDIRX = 23
+    AMOGUS_TEX = 24; AMOGUS_PLRDIRY = 24
+    AMOGUS_SETTINGS = 25; AMOGUS_DRAWTOSCREEN = 25
+    AMOGUS_CAMDIRX = 26
+    AMOGUS_CAMDIRY = 27
+    AMOGUS_CAMDIRZ = 28
+    AMOGUS_SUBMITVERT = 29
+    AMOGUS_DRAWQUAD = 30
+    AMOGUS_CLEARBUFFER = 31
