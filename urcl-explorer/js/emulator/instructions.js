@@ -228,9 +228,9 @@ export var IO_Port;
     IO_Port[IO_Port["PI2"] = 66] = "PI2";
     //block RAM
     IO_Port[IO_Port["BLOCKRAM_XY"] = 67] = "BLOCKRAM_XY";
-    IO_Port[IO_Port["BLOCKRAM_ZI"] = 68] = "BLOCKRAM_ZI";
+    IO_Port[IO_Port["BLOCKRAM_Z"] = 68] = "BLOCKRAM_Z";
     IO_Port[IO_Port["BLOCKRAM_ID"] = 69] = "BLOCKRAM_ID";
-    IO_Port[IO_Port["BLOCKRAM_ZI_SET"] = 70] = "BLOCKRAM_ZI_SET";
+    IO_Port[IO_Port["BLOCKRAM_ZI"] = 70] = "BLOCKRAM_ZI";
     //blockToMesh
     IO_Port[IO_Port["MESHGEN_BLOCKXY"] = 71] = "MESHGEN_BLOCKXY";
     IO_Port[IO_Port["MESHGEN_BLOCKZ"] = 72] = "MESHGEN_BLOCKZ";

@@ -88,26 +88,32 @@ export class BlockRAM implements Device {
     x = 0;
     y = 0;
     z = 0;
-    id = 0;
-    constructor() {
 
+	outputs = {
+        [IO_Port.BLOCKRAM_XY]: (i:number) => {
+            this.x = i >> 4;
+            this.y = i & 0x0F;
+        },
+        [IO_Port.BLOCKRAM_Z]: (i:number) => {
+            this.z = i >> 4;
+        },
+		[IO_Port.BLOCKRAM_ID]: (i:number) => {
+			let id = i;
+			this.setBlock(this.x, this.y, this.z, id);
+		},
+		[IO_Port.BLOCKRAM_ZI]: (i:number) => {
+			this.z = i >> 4;
+			let id = i & 0xF;
+			this.setBlock(this.x, this.y, this.z, id);
+		}
     }
+
     inputs = { //TODO ensure all ports properly supported
         [IO_Port.BLOCKRAM_ID]: () => {
             return this.getBlock(this.x, this.y, this.z);
         },
         [IO_Port.BLOCKRAM_ZI]: () => {
             return (this.z << 4) | this.getBlock(this.x, this.y, this.z);
-        }
-    }
-    outputs = {
-        [IO_Port.BLOCKRAM_XY]: (i:number) => {
-            this.x = i >> 4;
-            this.y = i & 0x0F;
-        },
-        [IO_Port.BLOCKRAM_ZI]: (i:number) => {
-            this.z = i >> 4;
-            this.id = i & 0x0F;
         }
     }
 

@@ -45,9 +45,9 @@ class IO_Port(Enum):
     PI2 = 3
 
     BLOCKRAM_XY = 4
-    BLOCKRAM_ZI = 5
+    BLOCKRAM_Z = 5
     BLOCKRAM_ID = 6
-    BLOCKRAM_ZI_SET = 7
+    BLOCKRAM_ZI = 7
 
     MESHGEN_BLOCKXY = 8
     MESHGEN_BLOCKZ = 9

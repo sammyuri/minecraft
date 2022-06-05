@@ -87,23 +87,30 @@ export class BlockRAM {
         this.x = 0;
         this.y = 0;
         this.z = 0;
-        this.id = 0;
+        this.outputs = {
+            [IO_Port.BLOCKRAM_XY]: (i) => {
+                this.x = i >> 4;
+                this.y = i & 0x0F;
+            },
+            [IO_Port.BLOCKRAM_Z]: (i) => {
+                this.z = i >> 4;
+            },
+            [IO_Port.BLOCKRAM_ID]: (i) => {
+                let id = i;
+                this.setBlock(this.x, this.y, this.z, id);
+            },
+            [IO_Port.BLOCKRAM_ZI]: (i) => {
+                this.z = i >> 4;
+                let id = i & 0xF;
+                this.setBlock(this.x, this.y, this.z, id);
+            }
+        };
         this.inputs = {
             [IO_Port.BLOCKRAM_ID]: () => {
                 return this.getBlock(this.x, this.y, this.z);
             },
             [IO_Port.BLOCKRAM_ZI]: () => {
                 return (this.z << 4) | this.getBlock(this.x, this.y, this.z);
-            }
-        };
-        this.outputs = {
-            [IO_Port.BLOCKRAM_XY]: (i) => {
-                this.x = i >> 4;
-                this.y = i & 0x0F;
-            },
-            [IO_Port.BLOCKRAM_ZI]: (i) => {
-                this.z = i >> 4;
-                this.id = i & 0x0F;
             }
         };
     }

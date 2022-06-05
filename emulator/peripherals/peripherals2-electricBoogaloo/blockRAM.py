@@ -3,7 +3,31 @@ from ports import IO_Port
 from meshGen import Block
 
 class BlockRam(Peripheral):
-    blockGrid= [
+	x:int = 0
+	y:int = 0
+	z:int = 0
+
+	def recieve(self, data:int, port:IO_Port):
+		if (port == IO_Port.BLOCKRAM_XY):
+			self.x = data >> 4
+			self.y = data & 0x0F
+		elif (port == IO_Port.BLOCKRAM_Z):
+			self.z = data >> 4
+		elif (port == IO_Port.BLOCKRAM_ID):
+			id == data
+			self.setBlock(self.x, self.y, self.z, id)
+		elif (port == IO_Port.BLOCKRAM_ZI):
+			self.z = data >> 4
+			id = data & 0x0F
+			self.setBlock(self.x, self.y, self.z, id)
+
+	def send(self, port:IO_Port):
+		if (port == IO_Port.BLOCKRAM_ID):
+			return self.getBlock(self.x, self.y, self.z)
+		elif (port == IO_Port.BLOCKRAM_ZI):
+			return (self.z << 4) | self.getBlock(self.x, self.y, self.z)
+
+	blockGrid = [
         [
             [ Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , ],
             [ Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , Block.stone , ],
@@ -85,3 +109,16 @@ class BlockRam(Peripheral):
     		[ Block.air   , Block.air   , Block.air   , Block.air   , Block.air   , Block.air   , Block.air   , Block.air   , ],
         ]
     ]
+
+	def getBlock(self, x:int, y:int, z:int) -> Block:
+		if (0 <= x and x < 8):
+			if (0 <= y and y < 8):
+				if (0 <= z and z < 8):
+					return self.blockGrid[y][7-z][x]
+		return Block.air
+	
+	def setBlock(self, x:int, y:int, z:int, id:Block):
+		if (0 <= x and x < 8):
+			if (0 <= y and y < 8):
+				if (0 <= z and z < 8):
+					self.blockGrid[y][7-z][x] = id
