@@ -6,59 +6,6 @@ from ports import IO_Port
 from blockRAM import BlockRam
 from amogus import Amogus, Vertex, Texture
 
-class MeshGen(Peripheral):
-    def __init__(self, blockRam:BlockRam, amogus:Amogus, port:int, portrange):
-        self.blockRam = blockRam
-        self.amogus = amogus
-
-        self.port = port
-        self.portrange = portrange
-    
-    block = {
-        ["pos"]: [0, 0, 0],
-        ["breakphase"]: 0
-    }
-    item = {
-        ["pos"]: [0, 0, 0],
-        ["id"]: 0
-    }
-    face = {
-        ["texture"]: Texture.empty,
-        ["small"]: False,
-        ["direction"]: 0,
-        ["texSettings"]: 0b0000
-    }
-
-    def recieve(self, data:int, port:int):
-        if (port == IO_Port.MESHGEN_BLOCKXY):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_BLOCKZ):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_BREAKPHASE):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_ITEMXZ):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_ITEMY):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_ITEMID):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_TEX):
-            pass #TODO
-        if (port == IO_Port.MESHGEN_SETTINGS):
-            pass #TODO
-    
-    def send(self, port:int):
-        if (port == IO_Port.MESHGEN_RENDERFACE):
-            return 0 #TODO
-        if (port == IO_Port.MESHGEN_RENDERITEM):
-            return 0 #TODO
-        if (port == IO_Port.MESHGEN_RENDEROVERLAY):
-            return 0 #TODO
-        if (port == IO_Port.MESHGEN_RENDERSCENE):
-            return 0 #TODO
-
-
-
 def isTransparent(blockId):
     TRANSPARENTBLOCKS = [Block.air, Block.leaves, Block.sapling, Block.glass, Block.chest]
     if (blockId in TRANSPARENTBLOCKS):
@@ -76,8 +23,6 @@ def isBlockItem(itemId):
     if (itemId in NONBLOCKITEMS):
         return False
     return True
-
-
 
 class Block(Enum):
     air = 0x0
@@ -920,3 +865,208 @@ MeshROM = {
     }
 }
 
+class MeshGen(Peripheral):
+    def __init__(self, blockRam:BlockRam, amogus:Amogus, port:IO_Port, portrange):
+        self.blockRam = blockRam
+        self.amogus = amogus
+
+        self.port = port
+        self.portrange = portrange
+    
+    block = {
+        ["pos"]: [0, 0, 0],
+        ["breakphase"]: 0
+    }
+    item = {
+        ["pos"]: [0, 0, 0],
+        ["id"]: 0
+    }
+    face = {
+        ["texture"]: Texture.empty,
+        ["small"]: False,
+        ["direction"]: 0,
+        ["texSettings"]: 0b0000
+    }
+
+    def recieve(self, data:int, port:IO_Port):
+        if (port == IO_Port.MESHGEN_BLOCKXY):
+            self.block.x = data >> 4
+            self.block.y = data & 0xF
+        elif (port == IO_Port.MESHGEN_BLOCKZ):
+            self.block.z = data >> 4
+        elif (port == IO_Port.MESHGEN_BREAKPHASE):
+            self.block.breakPhase = data
+        elif (port == IO_Port.MESHGEN_ITEMXZ):
+            self.item.x = (data >> 4) / 2
+            self.item.z = (data & 0xF) / 2
+        elif (port == IO_Port.MESHGEN_ITEMY):
+            self.item.y = data / 16
+        elif (port == IO_Port.MESHGEN_ITEMID):
+            self.item.id = data
+        elif (port == IO_Port.MESHGEN_TEX):
+            self.face.texture = data
+        elif (port == IO_Port.MESHGEN_SETTINGS):
+            self.face.small = (data & 0b0100_0000) != 0
+            self.face.direction = (data & 0b0011_0000) >> 4
+            self.face.texSettings = data & 0b0000_1111
+    
+    def send(self, port:int):
+        if (port == IO_Port.MESHGEN_RENDERFACE):
+            self.RenderOverlay(self.block.x, self.block.y, self.block.z, self.block.breakPhase);
+            return 0
+        if (port == IO_Port.MESHGEN_RENDERITEM):
+            self.RenderScene()
+            return 0
+        if (port == IO_Port.MESHGEN_RENDEROVERLAY):
+            self.RenderItem(self.item.x, self.item.y, self.item.z, self.item.id)
+            return 0
+        if (port == IO_Port.MESHGEN_RENDERSCENE):
+            self.RenderFace(self.block.x, self.block.y, self.block.z, self.face.texture, self.face.direction, self.face.small)
+            return 0
+    
+
+    def RenderOverlay(self, x:int, y:int, z:int, breakPhase:int):
+        texId = 0x1A + breakPhase
+        Faces = [
+            [-1, 0, 0],
+            [1, 0, 0],
+            [0, 0, -1],
+            [0, 0, 1],
+            [0, -1, 0],
+            [0, 1, 0],
+        ]
+        BlockQuads = [
+            Quad.fullBlockNegX,
+            Quad.fullBlockPosX,
+            Quad.fullBlockNegZ,
+            Quad.fullBlockPosZ,
+            Quad.fullBlockNegY,
+            Quad.fullBlockPosY,
+        ]
+        for i in range(6):
+            adj = self.blockRAM.getBlock(
+                x + Faces[i][0],
+                y + Faces[i][1],
+                z + Faces[i][2]
+            )
+            if(not self.isTransparent(adj)):
+                self.RenderQuad(x, y, z, BlockQuads[i], texId, 0b1101)
+
+    def RenderItem(self, x:int, y:int, z:int, itemId:Item):
+        item = MeshROM[itemId].item
+        if (self.isBlockItem(itemId)):
+            ItemQuads = [
+                Quad.blockItemNegY,
+                Quad.blockItemPosY,
+                Quad.blockItemNegX,
+                Quad.blockItemPosX,
+                Quad.blockItemNegZ,
+                Quad.blockItemPosZ
+            ]
+            TexIndices = [ 1, 0, 2, 2, 3, 2 ]
+            for i in range(6):
+                texture = item.textures[i]
+                self.RenderQuad(x, y, z, ItemQuads[i], texture.id, texture.settings)
+        else:
+            for i in range(8):
+                quad = item.quads[i]
+                if (quad.id == 0x1F):
+                    break
+                texture = item.textures[quad.texIndex]
+                self.RenderQuad(x, y, z, quad.id, texture.id, texture.settings)
+        self.RenderQuad(x, y, z, Quad.itemShadow, Texture.shadow, 0b1110)
+
+    def RenderFace(self, x:int, y:int, z:int, texId:Texture, direction:int, small:bool):
+        quadId = direction + (8 if small else 0)
+        self.RenderQuad(x, y, z, quadId, texId, 0b1000)
+
+    def RenderScene(self):
+        for axis in range(3):
+            previousFace:Quad = 0
+            currentFace:Quad = 0
+            previousTexIndex:int = 0
+            currentTexIndex:int = 0
+            if axis == 0:
+                currentFace = Quad.fullBlockNegX
+                previousFace = Quad.fullBlockPosX
+                currentTexIndex = 2
+                previousTexIndex = 2
+            elif axis == 1:
+                currentFace = Quad.fullBlockNegZ
+                previousFace = Quad.fullBlockPosZ
+                currentTexIndex = 2
+                previousTexIndex = 2
+            else:
+                currentFace = Quad.fullBlockNegY
+                previousFace = Quad.fullBlockPosY
+                currentTexIndex = 1
+                previousTexIndex = 0
+            for a1 in range(8):
+                for a2 in range(8):
+                    previous:Block = Block.air
+                    previousFull = False
+                    previousTransparent = False
+                    for a3 in range(8):
+                        position = []
+                        if axis == 0:
+                            position = [a3, a1, a2]
+                        elif axis == 1:
+                            position = [a1, a2, a3]
+                        else:
+                            position = [a2, a3, a1]
+                        current:Block = self.blockRAM.getBlock(position[0], position[1], position[2])
+                        currentFull = self.isFull(current)
+                        currentTransparent = self.isTransparent(current)
+                        if (axis == 2):
+                            if (position[1] == 0 and currentTransparent):
+                                self.RenderQuad(position[0], position[1], position[2], Quad.bedrock, Texture.stone, 0b1010)
+                            elif (position[1] == 7 and currentFull):
+                                texture = MeshROM[current].block.textures[0]
+                                self.RenderQuad(position[0], position[1], position[2], Quad.fullBlockPosY, texture.id, texture.settings)
+                            if (not currentFull and current != Block.air):
+                                blockData = MeshROM[current].block
+                                for i in range(7):
+                                    quad = blockData.quads[i]
+                                    if (quad.id == 0x1F):
+                                        break
+                                    texture = blockData.textures[quad.texIndex]
+                                    self.RenderQuad(position[0], position[1], position[2], quad.id, texture.id, texture.settings)
+                        if (current == previous):
+                            previous = current
+                            previousFull = currentFull
+                            previousTransparent = currentTransparent
+                            continue
+                        if (currentTransparent and previousFull):
+                            texture = MeshROM[previous].block.textures[previousTexIndex]
+                            self.RenderQuad(position[0] - (1 if axis == 0 else 0), position[1] - (1 if axis == 2 else 0), position[2] - (1 if axis == 1 else 0), previousFace, texture.id, texture.settings)
+                        if (previousTransparent and currentFull):
+                            texture = MeshROM[current].block.textures[currentTexIndex]
+                            self.RenderQuad(position[0], position[1], position[2], currentFace, texture.id, texture.settings)
+                        previous = current
+                        previousFull = currentFull
+                        previousTransparent = currentTransparent
+    
+    def RenderQuad(self, x:float, y:float, z:float, quadId:Quad, texId:Texture, texSettings:int):
+        quad = []
+        Uvs = [
+            [0, 0],
+            [0, 1],
+            [1, 1],
+            [1, 0]
+        ]
+        template = Quads[quadId]
+        for i in range(4):
+            vertex:Vertex = Vertex(
+                x * 16 + template[i][0],
+                y * 16 + template[i][1],
+                z * 16 + template[i][2],
+                Uvs[i][0],
+                Uvs[i][1]
+            )
+            quad[i] = self.amogus.world_to_cam(vertex)
+        self.amogus.texture = texId
+        self.amogus.settings.cullBackface = (texSettings & 0b1000) != 0
+        self.amogus.settings.transparent = (texSettings & 0b0100) != 0
+        self.amogus.settings.inverted = (texSettings & 0b0010) != 0
+        self.amogus.settings.overlay = (texSettings & 0b0001) != 0
+        self.amogus.drawQuad(quad)
