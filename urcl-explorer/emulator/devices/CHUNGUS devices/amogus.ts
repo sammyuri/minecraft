@@ -535,9 +535,7 @@ export class Amogus implements Device {
         return new Vertex(vx, vy, vz, vertex.u, vertex.v);
     }
 
-    operations:number = 0;
     FixedPointNumber(value:number, bits:number, precision:number, signed = false, f = false) {
-        this.operations += 1;
         let bitmask = (1 << bits) - 1;
         let shiftamount = 1 << precision;
         value = Math.floor(value * shiftamount) & bitmask;
