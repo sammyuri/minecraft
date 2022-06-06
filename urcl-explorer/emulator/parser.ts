@@ -95,7 +95,7 @@ export function parse(source: string, options: Parse_Options = {}): Parser_outpu
     out.lines = source.split('\n').map(line => 
         line.replace(/,/g, "").replace(/\s+/g, " ").replace(/\/\/.*/g, "").trim()
     );
-    //TODO: multiline comments
+    //\TODO: multiline comments
     for (let i = 0; i < enum_count(URCL_Header); i++){
         out.headers[i as URCL_Header] = {value: urcl_headers[i as URCL_Header].def};
         out.headers[i as URCL_Header].operant = urcl_headers[i as URCL_Header].def_operant;

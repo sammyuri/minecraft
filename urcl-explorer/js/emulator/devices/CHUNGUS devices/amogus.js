@@ -1,5 +1,4 @@
 import { IO_Port } from "../../instructions.js";
-//TODO: maybe import screen
 const CLIP = 3;
 const SCREEN_WIDTH = 96;
 const SCREEN_HEIGHT = 64;
@@ -504,7 +503,7 @@ export var Texture;
     Texture[Texture["break4"] = 30] = "break4";
     Texture[Texture["break5"] = 31] = "break5";
 })(Texture || (Texture = {}));
-const Textures = {
+const Textures = { //TODO: add remaining textures
     [Texture.empty]: [
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,

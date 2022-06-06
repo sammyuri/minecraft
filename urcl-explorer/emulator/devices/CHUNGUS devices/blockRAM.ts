@@ -108,7 +108,7 @@ export class BlockRAM implements Device {
 		}
     }
 
-    inputs = { //TODO ensure all ports properly supported
+    inputs = {
         [IO_Port.BLOCKRAM_ID]: () => {
             return this.getBlock(this.x, this.y, this.z);
         },

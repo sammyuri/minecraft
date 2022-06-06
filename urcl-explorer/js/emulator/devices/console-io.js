@@ -66,7 +66,7 @@ export class Console_IO {
             }
             this.write(v.toString());
         },
-        // TODO: make specific implementations for these
+        //\TODO: make specific implementations for these
         [IO_Port.ASCII]: this.text_out,
         [IO_Port.CHAR5]: this.text_out,
         [IO_Port.CHAR6]: this.text_out,

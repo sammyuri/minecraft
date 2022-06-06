@@ -1,7 +1,6 @@
 import { Device } from "../device.js";
 import { IO_Port } from "../../instructions.js";
 import { Gl_Display } from "../gl-display.js";
-//TODO: maybe import screen
 
 const CLIP = 3;
 const SCREEN_WIDTH = 96;
@@ -587,7 +586,7 @@ export enum Texture {
     break5 = 0x1F,
 }
 
-const Textures:any = {
+const Textures:any = { //TODO: add remaining textures
     [Texture.empty]: [
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,

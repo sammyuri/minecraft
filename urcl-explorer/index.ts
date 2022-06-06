@@ -289,7 +289,7 @@ try {
 
     if (storage_uploaded){
         const bytes = storage_uploaded.slice();
-        emulator.add_io_device(storage_device = new Storage(emulator.bits, bytes, storage_little.checked, bytes.length)); // TODO: add little endian option
+        emulator.add_io_device(storage_device = new Storage(emulator.bits, bytes, storage_little.checked, bytes.length)); // \TODO: add little endian option
         storage_msg.innerText = `loaded storage device with ${0| bytes.length / (emulator.bits / 8)} words, ${storage_loads++ % 2 === 0 ? "flip" : "flop"}`;
     }
 
