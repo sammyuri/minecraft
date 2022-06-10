@@ -68,11 +68,11 @@ export class Amogus implements Device {
         }
     }
     inputs = {
-        [IO_Port.AMOGUS_PLRDIRX]: () => {
-            return Math.floor(-Math.sin(Math.PI * 2 * this.cam.yawIndex / 16) * 64);
+        [IO_Port.AMOGUS_SINYAW]: () => {
+            return Math.floor(this.cam.matrix[0][2] * 64);
         },
-        [IO_Port.AMOGUS_PLRDIRZ]: () => {
-            return Math.floor(Math.cos(Math.PI * 2 * this.cam.yawIndex / 16) * 64);
+        [IO_Port.AMOGUS_COSYAW]: () => {
+            return Math.floor(this.cam.matrix[0][0] * 64);
         },
         [IO_Port.AMOGUS_CAMDIRX]: () => {
             return Math.floor(this.cam.matrix[2][0] * 64);

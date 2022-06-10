@@ -218,9 +218,9 @@ class Amogus(Peripheral):
             self.settings["overlay"] = (data & 0x01) != 0
     
     def send(self, port:IO_Port):
-        if (port == IO_Port.AMOGUS_PLRDIRX):
+        if (port == IO_Port.AMOGUS_SINYAW):
             return math.floor(-math.sin(math.pi * 2 * self.cam["rotation"][0] / 16) * 64)
-        elif (port == IO_Port.AMOGUS_PLRDIRZ):
+        elif (port == IO_Port.AMOGUS_COSYAW):
             return math.floor(math.cos(math.pi * 2 * self.cam["rotation"][0] / 16) * 64)
         elif (port == IO_Port.AMOGUS_CAMDIRX):
             return math.floor(self.cam["matrix"][2][0] * 64)
