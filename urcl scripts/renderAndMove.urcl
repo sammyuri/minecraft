@@ -1,0 +1,128 @@
+bits == 8
+minreg 7
+minheap 4
+
+@define x m0 //replace with 0x00 if m0 not supported in translator
+@define y m1
+@define z m2
+@define rot m3
+
+str x 0x18
+str y 0x38
+str z 0x18
+str rot 0xfe
+
+//TODO: update this script to use the new %playerinput port
+
+.loop
+
+    out %buffer 0 //screen buffer
+    in r0 %amogus_clearbuffer
+
+    //handle inputs
+        in r1 %pi1
+
+        bsr r2 r1 5
+        sub r2 r2 4
+        bsl r2 r2 4
+
+        bsr r3 r1 2
+        and r3 r3 0b0000_0111
+        sub r3 r3 4
+        and r3 r3 0b0000_1111
+        or r2 r2 r3
+        lod r1 rot
+        addv r1 r1 r2
+        str rot r1
+
+        in r1 %pi2
+
+        bsr r2 r1 5
+        sub r2 r2 4 //r2 = forward movement
+        in r3 %amogus_sinyaw //r3 = player direction x component
+        cal .moveHelperFunc //r4 = player forward movement x component
+        //r2, r3, r5, r6 = junk
+        lod r5 x
+        add r4 r5 r4
+        str x r4
+
+        bsr r2 r1 5
+        sub r2 r2 4 //r2 = forward movement
+        in r3 %amogus_cosyaw //r3 = player direction z component
+        cal .moveHelperFunc //r4 = player forward movement z component
+        //r2, r3, r5, r6 = junk
+        lod r5 z
+        add r4 r5 r4
+        str z r4
+
+        bsr r2 r1 2
+        and r2 r2 0b0000_0111
+        sub r2 r2 4 //r2 = strafe movement
+        in r3 %amogus_sinyaw //r3 = player direction x component
+        neg r3 r3
+        cal .moveHelperFunc //r4 = player strafe movement x component
+        //r2, r3, r5, r6 = junk
+        lod r5 z
+        add r4 r5 r4
+        str z r4
+
+        bsr r2 r1 2
+        and r2 r2 0b0000_0111
+        sub r2 r2 4 //r2 = strafe movement
+        in r3 %amogus_cosyaw //r3 = player direction z component
+        cal .moveHelperFunc //r4 = player strafe movement z component
+        //r2, r3, r5, r6 = junk
+        lod r5 x
+        add r4 r5 r4
+        str x r4
+
+        lod r3 y
+        and r2 r1 0b0000_0010
+        brz ~+2 r2
+            sub r3 r3 8
+        bev ~+2 r1
+            add r3 r3 8
+        str y r3
+
+    lod r1 x
+    out %amogus_camx r1
+    lod r1 y
+    out %amogus_camy r1
+    lod r1 z
+    out %amogus_camz r1
+    lod r1 rot
+    out %amogus_camrot r1
+
+    in r0 %meshgen_renderscene
+
+    in r0 %amogus_drawtoscreen
+
+    out %wait 125
+    in r0 %wait
+jmp .loop
+
+hlt
+
+//moveHelperFunc
+    //inputs:
+        //r2: local movement vector component (not preserved)
+        //r3: direction of component in global axis (not preserved)
+    //outputs:
+        //r4: component of movement in world axis
+    //also uses:
+        //r5 (not preserved)
+        //r6 (not preserved)
+.moveHelperFunc
+    xor r6 r2 r3
+    brp ~+2 r2
+        neg r2 r2
+    brp ~+2 r3
+        neg r3 r3
+    mlt r4 r2 r3
+    umlt r5 r2 r3
+    bsr r4 r4 4
+    bsl r5 r5 4
+    or r4 r4 r5
+    brp ~+2 r6
+        neg r4 r4
+ret
