@@ -61,10 +61,10 @@ export class Amogus {
         };
         this.inputs = {
             [IO_Port.AMOGUS_SINYAW]: () => {
-                return Math.floor(-Math.sin(Math.PI * 2 * this.cam.yawIndex / 16) * 64);
+                return Math.floor(this.cam.matrix[0][2] * 64);
             },
             [IO_Port.AMOGUS_COSYAW]: () => {
-                return Math.floor(Math.cos(Math.PI * 2 * this.cam.yawIndex / 16) * 64);
+                return Math.floor(this.cam.matrix[0][0] * 64);
             },
             [IO_Port.AMOGUS_CAMDIRX]: () => {
                 return Math.floor(this.cam.matrix[2][0] * 64);
@@ -93,7 +93,6 @@ export class Amogus {
                 return 0;
             }
         };
-        this.operations = 0;
         this.display = display;
         this.resetBuffer();
     }
@@ -457,7 +456,6 @@ export class Amogus {
         return new Vertex(vx, vy, vz, vertex.u, vertex.v);
     }
     FixedPointNumber(value, bits, precision, signed = false, f = false) {
-        this.operations += 1;
         let bitmask = (1 << bits) - 1;
         let shiftamount = 1 << precision;
         value = Math.floor(value * shiftamount) & bitmask;
@@ -503,7 +501,7 @@ export var Texture;
     Texture[Texture["break4"] = 30] = "break4";
     Texture[Texture["break5"] = 31] = "break5";
 })(Texture || (Texture = {}));
-const Textures = { //TODO: add remaining textures
+const Textures = {
     [Texture.empty]: [
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,
