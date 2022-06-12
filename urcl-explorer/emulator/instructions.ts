@@ -107,7 +107,7 @@ export enum IO_Port {
         //Crafting ROM
         CRAFTROM,
         //player input
-        PI1, PI2,
+        PLAYERINPUT,
         //block RAM
         BLOCKRAM_XY, BLOCKRAM_Z, BLOCKRAM_ID, BLOCKRAM_ZI,
         //blockToMesh

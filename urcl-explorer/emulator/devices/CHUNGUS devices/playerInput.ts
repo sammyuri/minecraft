@@ -3,54 +3,53 @@ import { IO_Port } from "../../instructions.js";
 
 export class PlayerInput implements Device {
     inputs = {
-        [IO_Port.PI1]: () => { //returns PPP_YYY_BU
-            let output = 0;
-            if (this.keys.look_up) {
-                output = 5 << 5; //1+4 = 5
-            } else if (this.keys.look_down) {
-                output = 3 << 5; //-1+4 = 3
+        [IO_Port.PLAYERINPUT]: () => { //returns PPP_YYY_BU
+            if (this.queue.length == 0) {
+                let output = 0;
+                //TODO: inventory movement
+
+                this.queue[1] = this.keys.break ? 1 : 0;
+                this.queue[2] = this.keys.use ? 1 : 0;
+                this.queue[3] = this.keys.crouch ? 1 : 0;
+
+                output = 0;
+                if (this.keys.look_up) {
+                    output = 1 << 4;
+                } else if (this.keys.look_down) {
+                    output = (-1 & 0x0F) << 4;
+                } else {
+                    output = 0 << 4;
+                }
+                if (this.keys.look_left) {
+                    output |= 1;
+                } else if (this.keys.look_right) {
+                    output |= (-1 && 0x0F);
+                } else {
+                    output |= 0;
+                }
+                this.queue[4] = output;
+                
+                let speed = this.keys.crouch ? 1 : 2;
+                if (this.keys.move_forward) {
+                    this.queue[5] = (speed + (this.keys.sprint && !this.keys.crouch ? 1 : 0));
+                } else if (this.keys.move_backward) {
+                    this.queue[5] = -speed & 0xFF;
+                } else {
+                    this.queue[5] = 0;
+                }
+
+                if (this.keys.move_left) {
+                    this.queue[6] = -speed & 0xFF;
+                } else if (this.keys.move_right) {
+                    this.queue[6] = speed;
+                } else {
+                    this.queue[6] = 0;
+                }
+
+                this.queue[7] = this.keys.jump ? 1 : 0;
             } else {
-                output = 4 << 5;
+                return this.queue.shift();
             }
-            if (this.keys.look_left) {
-                output |= 5 << 2; //1+4 = 5
-            } else if (this.keys.look_right) {
-                output |= 3 << 2; //-1+4 = 3
-            } else {
-                output |= 4 << 2;
-            }
-            if (this.keys.break) {
-                output |= 1 << 1;
-            }
-            if (this.keys.use) {
-                output |= 1;
-            }
-            return output;
-        },
-        [IO_Port.PI2]: () => { //returns FFF_SSS_CJ
-            let output = 0;
-            let speed = this.keys.crouch ? 1 : 2;
-            if (this.keys.move_forward) {
-                output = (speed + 4 + (this.keys.sprint ? 1 : 0)) << 5;
-            } else if (this.keys.move_backward) {
-                output = (-speed + 4) << 5;
-            } else {
-                output = 4 << 5;
-            }
-            if (this.keys.move_left) {
-                output |= (-speed + 4) << 2;
-            } else if (this.keys.move_right) {
-                output |= (speed + 4) << 2;
-            } else {
-                output |= 4 << 2;
-            }
-            if (this.keys.crouch) {
-                output |= 1 << 1;
-            }
-            if (this.keys.jump) {
-                output |= 1;
-            }
-            return output;
         }
     }
     keys = {
@@ -69,6 +68,7 @@ export class PlayerInput implements Device {
         crouch: false,
         sprint: false
     }
+    queue:number[] = []
     constructor() {
         addEventListener("keydown", (e:KeyboardEvent) => {
             switch (e.key) {
