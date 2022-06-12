@@ -41,8 +41,7 @@ class IO_Port(Enum):
 
     RNG = 1
 
-    PI1 = 2
-    PI2 = 3
+    PLAYERINPUT = 2
 
     BLOCKRAM_XY = 4
     BLOCKRAM_Z = 5
