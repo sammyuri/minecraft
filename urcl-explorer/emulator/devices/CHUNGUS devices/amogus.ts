@@ -1,10 +1,10 @@
 import { Device } from "../device.js";
 import { IO_Port } from "../../instructions.js";
-import { Gl_Display } from "../gl-display.js";
+import { Screen } from "./screen.js";
 
 const CLIP = 3;
-const SCREEN_WIDTH = 96;
-const SCREEN_HEIGHT = 64;
+export const SCREEN_WIDTH = 96;
+export const SCREEN_HEIGHT = 64;
 const LENS = 56;
 
 export class Amogus implements Device {
@@ -16,7 +16,7 @@ export class Amogus implements Device {
         yawIndex: 0,
         pitchIndex: 0
     }
-    display:Gl_Display;
+    screen:Screen;
     currentVertex:Vertex = new Vertex();
     quad:Vertex[] = [new Vertex(), new Vertex(), new Vertex(), new Vertex()];
     texture = 0;
@@ -27,8 +27,8 @@ export class Amogus implements Device {
         overlay: false,
     };
     zbuffer:number[][][] = [];
-    constructor(display:Gl_Display) {
-        this.display = display;
+    constructor(screen:Screen) {
+        this.screen = screen;
         this.resetBuffer();
     }
     outputs = {
@@ -104,14 +104,10 @@ export class Amogus implements Device {
 
     drawBufferToScreen() {
         for (let y = 0; y < SCREEN_HEIGHT; y++) {
-            this.display.y_out(y)
             for (let x = 0; x < SCREEN_WIDTH; x++) {
-                this.display.x_out(x);
-                this.display.color_out(this.zbuffer[y][x][1]);
+                this.screen.buffer[y][x] = this.zbuffer[y][x][1];
             }
         }
-        this.display.update_display();
-        this.display.clear();
     }
 
     resetBuffer() {
@@ -586,7 +582,7 @@ export enum Texture {
     break5 = 0x1F,
 }
 
-const Textures:any = { //TODO: add remaining textures
+export const Textures:any = { //TODO: add remaining textures
     [Texture.empty]: [
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,

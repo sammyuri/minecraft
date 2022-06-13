@@ -1,11 +1,32 @@
 import { IO_Port } from "../../instructions.js";
 export class PlayerInput {
     constructor() {
+        this.keys = {
+            look_up: false,
+            look_down: false,
+            look_left: false,
+            look_right: false,
+            break: false,
+            use: false,
+            move_forward: false,
+            move_backward: false,
+            move_left: false,
+            move_right: false,
+            jump: false,
+            crouch: false,
+            sprint: false
+        };
+        this.queue = [];
+        this.outputs = {
+            [IO_Port.PLAYERINPUT]: (i) => {
+                this.queue = [];
+            }
+        };
         this.inputs = {
             [IO_Port.PLAYERINPUT]: () => {
                 if (this.queue.length == 0) {
                     let output = 0;
-                    //TODO: inventory movement
+                    this.queue[0] = 0; //TODO: inventory movement
                     this.queue[1] = this.keys.break ? 1 : 0;
                     this.queue[2] = this.keys.use ? 1 : 0;
                     this.queue[3] = this.keys.crouch ? 1 : 0;
@@ -49,28 +70,13 @@ export class PlayerInput {
                         this.queue[6] = 0;
                     }
                     this.queue[7] = this.keys.jump ? 1 : 0;
+                    return 0;
                 }
                 else {
                     return this.queue.shift();
                 }
             }
         };
-        this.keys = {
-            look_up: false,
-            look_down: false,
-            look_left: false,
-            look_right: false,
-            break: false,
-            use: false,
-            move_forward: false,
-            move_backward: false,
-            move_left: false,
-            move_right: false,
-            jump: false,
-            crouch: false,
-            sprint: false
-        };
-        this.queue = [];
         addEventListener("keydown", (e) => {
             switch (e.key) {
                 case "Control":

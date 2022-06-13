@@ -1,10 +1,10 @@
 import { IO_Port } from "../../instructions.js";
 const CLIP = 3;
-const SCREEN_WIDTH = 96;
-const SCREEN_HEIGHT = 64;
+export const SCREEN_WIDTH = 96;
+export const SCREEN_HEIGHT = 64;
 const LENS = 56;
 export class Amogus {
-    constructor(display) {
+    constructor(screen) {
         this.cam = {
             x: 0,
             y: 0,
@@ -93,19 +93,15 @@ export class Amogus {
                 return 0;
             }
         };
-        this.display = display;
+        this.screen = screen;
         this.resetBuffer();
     }
     drawBufferToScreen() {
         for (let y = 0; y < SCREEN_HEIGHT; y++) {
-            this.display.y_out(y);
             for (let x = 0; x < SCREEN_WIDTH; x++) {
-                this.display.x_out(x);
-                this.display.color_out(this.zbuffer[y][x][1]);
+                this.screen.buffer[y][x] = this.zbuffer[y][x][1];
             }
         }
-        this.display.update_display();
-        this.display.clear();
     }
     resetBuffer() {
         this.zbuffer = [];
@@ -501,7 +497,7 @@ export var Texture;
     Texture[Texture["break4"] = 30] = "break4";
     Texture[Texture["break5"] = 31] = "break5";
 })(Texture || (Texture = {}));
-const Textures = {
+export const Textures = {
     [Texture.empty]: [
         0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0,

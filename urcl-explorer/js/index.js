@@ -18,6 +18,7 @@ import { PlayerInput } from "./emulator/devices/CHUNGUS devices/playerInput.js";
 import { BlockRAM } from "./emulator/devices/CHUNGUS devices/blockRAM.js";
 import { MeshGen } from "./emulator/devices/CHUNGUS devices/blockToMesh.js";
 import { Amogus } from "./emulator/devices/CHUNGUS devices/amogus.js";
+import { Screen } from "./emulator/devices/CHUNGUS devices/screen.js";
 let animation_frame;
 let running = false;
 let started = false;
@@ -188,7 +189,9 @@ emulator.add_io_device(new CraftingRom());
 emulator.add_io_device(new PlayerInput());
 const blockRAM = new BlockRAM();
 emulator.add_io_device(blockRAM);
-const amogus = new Amogus(display);
+const screen = new Screen(display);
+emulator.add_io_device(screen)
+const amogus = new Amogus(screen);
 emulator.add_io_device(amogus);
 emulator.add_io_device(new MeshGen(blockRAM, amogus));
 source_input.oninput = oninput;
