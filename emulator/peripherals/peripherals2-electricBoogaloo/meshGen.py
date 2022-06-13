@@ -443,19 +443,19 @@ MeshROM = {
             ["textures"]: [
                 { #top
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #bottom
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #sides
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #include front face because this block shares data with its item
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 }
             ],
             ["quads"]: []
@@ -464,19 +464,19 @@ MeshROM = {
             ["textures"]: [
                 { #top
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #bottom
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #sides
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 },
                 { #front
                     ["id"]: Texture.leaves,
-                    ["settings"]: 0b1100 #BTio
+                    ["settings"]: 0b1000 #BTio
                 }
             ],
             ["quads"]: []

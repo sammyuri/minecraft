@@ -298,25 +298,6 @@ export var Block;
     Block[Block["furnace"] = 14] = "furnace";
     Block[Block["chest"] = 15] = "chest";
 })(Block || (Block = {}));
-var Mesh;
-(function (Mesh) {
-    Mesh[Mesh["none"] = 0] = "none";
-    Mesh[Mesh["block"] = 1] = "block";
-    Mesh[Mesh["cross"] = 2] = "cross";
-    Mesh[Mesh["smallBlock"] = 3] = "smallBlock";
-    Mesh[Mesh["blockItem"] = 4] = "blockItem";
-    Mesh[Mesh["crossItem2Color"] = 5] = "crossItem2Color";
-    Mesh[Mesh["crossItemNoCull"] = 6] = "crossItemNoCull";
-    Mesh[Mesh["fullNegXFace"] = 7] = "fullNegXFace";
-    Mesh[Mesh["fullPosXFace"] = 8] = "fullPosXFace";
-    Mesh[Mesh["fullNegZFace"] = 9] = "fullNegZFace";
-    Mesh[Mesh["fullPosZFace"] = 10] = "fullPosZFace";
-    Mesh[Mesh["smallNegXFace"] = 11] = "smallNegXFace";
-    Mesh[Mesh["smallPosXFace"] = 12] = "smallPosXFace";
-    Mesh[Mesh["smallNegZFace"] = 13] = "smallNegZFace";
-    Mesh[Mesh["smallPosZFace"] = 14] = "smallPosZFace";
-    Mesh[Mesh["bedrock"] = 15] = "bedrock"; //0xF
-})(Mesh || (Mesh = {}));
 var Quad;
 (function (Quad) {
     Quad[Quad["fullBlockNegX"] = 0] = "fullBlockNegX";
@@ -692,19 +673,19 @@ const MeshROM = {
             textures: [
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 }
             ],
             quads: []
@@ -713,19 +694,19 @@ const MeshROM = {
             textures: [
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 },
                 {
                     id: Texture.leaves,
-                    settings: 0b1100 //BTio
+                    settings: 0b1000 //BTio
                 }
             ],
             quads: []
