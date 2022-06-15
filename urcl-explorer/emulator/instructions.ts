@@ -36,6 +36,9 @@ export enum Opcode {
     CLZ, //count leading zeros
     CTZ, //count trailing zeros
     BTC, //bit count (count ones)
+    SMLT446, //signed fixed point mult for s3.4 = s3.4 * s1.6
+    SDIV444, //signed fixed point div for s3.4 = s3.4 / s3.4
+    SDIV446, //signed fixed point div for s3.4 = s3.4 / s1.6
 }
 
 export enum Register {
@@ -304,12 +307,12 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
     [Opcode.__ASSERT_NEQ]: [[GET, GET], (s) => {if (s.a === s.b) fail_assert(s)}],
 
     //----- Custom CHUNGUS Instructions
-    [Opcode.UMLT ]: [[SET, GET, GET], (s) => { s.a = (s.b * s.c) >> s.bits }],
-    [Opcode.ADDV ]: [[SET, GET, GET], (s) => { s.a = (((s.b & 0xf0) + (s.c & 0xf0)) & 0xf0) | (((s.b & 0x0f) + (s.c & 0x0f)) & 0x0f) }],
-    [Opcode.SUBV ]: [[SET, GET, GET], (s) => { s.a = (((s.b & 0xf0) - (s.c & 0xf0)) & 0xf0) | (((s.b & 0x0f) - (s.c & 0x0f)) & 0x0f) }],
-    [Opcode.SQRT ]: [[SET, GET     ], (s) => { s.a = Math.sqrt(s.b) }],
-    [Opcode.CLZ  ]: [[SET, GET     ], (s) => { s.a = Math.clz32(s.b) - 24 }],
-    [Opcode.CTZ  ]: [[SET, GET     ], (s) => {
+    [Opcode.UMLT ]: [[SET, GET, GET], (s) => { s.a = (s.b * s.c) >> s.bits }], //upper word mult
+    [Opcode.ADDV ]: [[SET, GET, GET], (s) => { s.a = (((s.b & 0xf0) + (s.c & 0xf0)) & 0xf0) | (((s.b & 0x0f) + (s.c & 0x0f)) & 0x0f) }], //vector add
+    [Opcode.SUBV ]: [[SET, GET, GET], (s) => { s.a = (((s.b & 0xf0) - (s.c & 0xf0)) & 0xf0) | (((s.b & 0x0f) - (s.c & 0x0f)) & 0x0f) }], //vector subtract
+    [Opcode.SQRT ]: [[SET, GET     ], (s) => { s.a = Math.sqrt(s.b) }], //square root
+    [Opcode.CLZ  ]: [[SET, GET     ], (s) => { s.a = Math.clz32(s.b) - 24 }], //count leading zeros
+    [Opcode.CTZ  ]: [[SET, GET     ], (s) => { //count trailing zeros
         let trailingZeros = 32;
         let num = s.b & -s.b;
         if (num) trailingZeros--;
@@ -320,10 +323,19 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
         if (num & 0x55555555) trailingZeros -= 1;
         s.a = trailingZeros;
     }],
-    [Opcode.BTC  ]: [[SET, GET     ], (s) => {
+    [Opcode.BTC  ]: [[SET, GET     ], (s) => { //bit count
         let num = s.b - ((s.b >> 1) & 0x55555555);
         num = (num & 0x33333333) + ((num >> 2) & 0x33333333);
         s.a = (( num + (num >> 4) & 0x0f0f0f0f) * 0x01010101) >> 24;
+    }],
+    [Opcode.SMLT446]: [[SET, GET   ], (s) => {
+        s.a = (s.sb / 16) * (s.sc / 64) * 16;
+    }],
+    [Opcode.SDIV444]: [[SET, GET   ], (s) => {
+        s.a = (s.sb / 16) / (s.sc / 16) * 16;
+    }],
+    [Opcode.SDIV446]: [[SET, GET   ], (s) => {
+        s.a = (s.sb / 16) / (s.sc / 64) * 16;
     }]
 };
 
