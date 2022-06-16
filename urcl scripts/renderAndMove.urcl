@@ -1,123 +1,166 @@
 bits == 8
 minreg 7
 minheap 4
+minstack 5
 
-@define x m0 //replace with 0x00 if m0 not supported in translator
-@define y m1
-@define z m2
-@define rot m3
+//constants
+    //general constants
+        @define BLOCKSIZE 16
+        @define PLAYERWIDTH 9 //technically it's 10, but 9 makes calculations easier
+        @define PLAYERHEIGHT 28 //technically it's 29, but 28 makes calculations easier
+        @define HALFPLAYERWIDTH 5
+        @define PLAYERCAMHEIGHT 24
+    //block IDs
+        @define BLOCK_AIR 0x0
+        @define BLOCK_grass 0x1
+        @define BLOCK_DIRT 0x2
+        @define BLOCK_STONE 0x3
+        @define BLOCK_COBBLE 0x4
+        @define BLOCK_LOG 0x5
+        @define BLOCK_LEAVES 0x6
+        @define BLOCK_PLANK 0x7
+        @define BLOCK_COALORE 0x8
+        @define BLOCK_IRONORE 0x9
+        @define BLOCK_SAND 0xA
+        @define BLOCK_GLASS 0xB
+        @define BLOCK_SAPLING 0xC
+        @define BLOCK_TABLE 0xD
+        @define BLOCK_FURNACE 0xE
+        @define BLOCK_CHEST 0xF
+    //item IDs
+        @define ITEM_AIR 0x00
+        @define ITEM_STICK 0x10
+        @define ITEM_DIRT 0x20
+        @define ITEM_STONE 0x30
+        @define ITEM_COBBLE 0x40
+        @define ITEM_LOG 0x50
+        @define ITEM_LEAVES 0x60
+        @define ITEM_PLANK 0x70
+        @define ITEM_COAL 0x80
+        @define ITEM_IRONORE 0x90
+        @define ITEM_SAND 0xA0
+        @define ITEM_GLASS 0xB0
+        @define ITEM_SAPLING 0xC0
+        @define ITEM_IRONINGOT 0xD0
+        @define ITEM_APPLE 0xE0
+        @define ITEM_NONSTACKABLE 0xF0
 
+        @define ITEM_WOODPICKAXE 0xF0
+        @define ITEM_WOODAXE 0xF1
+        @define ITEM_WOODSHOVEL 0xF2
+        @define ITEM_WOODSWORD 0xF3
+        @define ITEM_STONEPICKAXE 0xF4
+        @define ITEM_STONEAXE 0xF5
+        @define ITEM_STONESHOVEL 0xF6
+        @define ITEM_STONESWORD 0xF7
+        @define ITEM_IRONPICKAXE 0xF8
+        @define ITEM_IRONAXE 0xF9
+        @define ITEM_IRONSHOVEL 0xFA
+        @define ITEM_IRONSWORD 0xFB
+        @define ITEM_SHEARS 0xFC
+        @define ITEM_TABLE 0xFD
+        @define ITEM_FURNACE 0xFE
+        @define ITEM_CHEST 0xFF
+
+//memory locations
+    @define x m0 //replace with 0x00 if 'm0' not supported in translator
+    @define y m1
+    @define z m2
+    @define rot m3
+
+//initial values
 str x 0x18
 str y 0x38
 str z 0x18
 str rot 0x00
 
-//TODO: update this script to use the new %playerinput port
-
-out %playerinput r0
+out %playerinput r0 //synchronize playerInput device
 
 .loop
 
-    in r0 %amogus_clearbuffer
-
     //handle inputs
+
         in r0 %playerinput //get input
-        in r0 %playerinput //inventory movement
-        in r0 %playerinput //is break pressed?
-        in r0 %playerinput //is place pressed?
 
-        in r1 %playerinput //is crouch pressed?
-        bev ~+4 r1
+        //handle miscellaneous inputs
+            in r0 %playerinput //inventory movement
+            in r0 %playerinput //is break pressed?
+            in r0 %playerinput //is place pressed?
+
+            in r1 %playerinput //is crouch pressed?
+            //# brz ~+4 r1 //this code moves the player down when shifting
+            //#     lod r1 y
+            //#     sub r1 r1 8
+            //#     str y r1
+
+        //handle rotation inputs
+            in r1 %playerinput //rotation
+
+            lod r2 rot
+            addv r1 r1 r2
+            str rot r1
+
+        //handle movement inputs
+            in r1 %playerinput //forward movement
+
+            in r2 %amogus_sinyaw
+            neg r3 r3
+            smlt446 r4 r1 r3 //r3 = velX
+
+            in r3 %amogus_cosyaw
+            smlt446 r5 r1 r3 //r4 = velZ
+
+            in r1 %playerinput //strafe movement
+
+            smlt446 r6 r1 r2
+            add r5 r5 r6 //r5 = velZ
+
+            smlt446 r5 r1 r3
+            add r4 r4 r6 //r4 = velX
+        
+        //TODO: move and collide in X and Z axes
+            psh r4 //stack 1 = velX
+            psh r5 //stack 2 = velZ
+            lod r1 x
+            add r1 r1 r4
+            bsr r1 r1 4 //r1 = minX
+            lod r2 y
+            bsr r2 r2 4 //r2 = minY
+            lod r3 z
+            add r3 r3 r5
+            bsr r3 r3 4 //r3 = minZ
+                    
+
+        //TODO: handle jumping and move and collide in Y
+            //# in r1 %playerinput //is jump pressed
+            //# brz ~+4 r1
+            //#     mov r3 0 //Y velocity if no jump
+            //#     lod r1 y
+            //#     and r1 r1 0x0F
+            //#     brz ~+2 r1 //check if on ground
+            //#         imm r3 17 //Y velocity upon jump.
+
+    //do rendering stuff
+        //send camera data to AMOGUS
+            lod r1 rot
+            out %amogus_camrot r1
+            lod r1 x
+            add r1 r1 HALFPLAYERWIDTH //move from corner of player to middle
+            out %amogus_camx r1
             lod r1 y
-            sub r1 r1 8
-            str y r1
+            add r1 r1 PLAYERCAMHEIGHT //don't place camera at feet
+            out %amogus_camy r1
+            lod r1 z
+            add r1 r1 HALFPLAYERWIDTH //move from corner of player to middle
+            out %amogus_camz r1
+        
+        in r0 %meshgen_renderscene
 
-        in r1 %playerinput //rotation
+        in r0 %amogus_drawtoscreen
+        in r0 %screen_buffer
 
-        lod r2 rot
-        addv r2 r2 r1
-        str rot r2
-
-        in r1 %playerinput //forward movement
-        mov r2 r1 //r2 = forward movement
-        in r3 %amogus_sinyaw //r3 = player direction x component
-        neg r3 r3
-        cal .moveHelperFunc //r4 = player forward movement x component
-        //r2, r3, r5, r6 = junk
-        lod r5 x
-        add r4 r5 r4
-        str x r4
-
-        mov r2 r1 //r2 = forward movement
-        in r3 %amogus_cosyaw //r3 = player direction z component
-        cal .moveHelperFunc //r4 = player forward movement z component
-        //r2, r3, r5, r6 = junk
-        lod r5 z
-        add r4 r5 r4
-        str z r4
-
-        in r1 %playerinput //strafe movement
-
-        mov r2 r1 //r2 = strafe movement
-        in r3 %amogus_sinyaw //r3 = player direction x component
-        cal .moveHelperFunc //r4 = player strafe movement x component
-        //r2, r3, r5, r6 = junk
-        lod r5 z
-        add r4 r5 r4
-        str z r4
-
-        mov r2 r1 //r2 = strafe movement
-        in r3 %amogus_cosyaw //r3 = player direction z component
-        cal .moveHelperFunc //r4 = player strafe movement z component
-        //r2, r3, r5, r6 = junk
-        lod r5 x
-        add r4 r5 r4
-        str x r4
-
-        in r1 %playerinput
-        bev ~+4 r1
-            lod r1 y
-            add r1 r1 8
-            str y r1
-
-    lod r1 x
-    out %amogus_camx r1
-    lod r1 y
-    out %amogus_camy r1
-    lod r1 z
-    out %amogus_camz r1
-    lod r1 rot
-    out %amogus_camrot r1
-
-    in r0 %meshgen_renderscene
-
-    in r0 %amogus_drawtoscreen
-    in r0 %screen_buffer
+        in r0 %amogus_clearbuffer
 
     out %wait 125
     in r0 %wait
 jmp .loop
-
-//moveHelperFunc
-    //inputs:
-        //r2: local movement vector component (not preserved)
-        //r3: direction of component in global axis (not preserved)
-    //outputs:
-        //r4: component of movement in world axis
-    //also uses:
-        //r5 (not preserved)
-        //r6 (not preserved)
-.moveHelperFunc
-    xor r6 r2 r3
-    brp ~+2 r2
-        neg r2 r2
-    brp ~+2 r3
-        neg r3 r3
-    mlt r4 r2 r3
-    umlt r5 r2 r3
-    bsr r4 r4 4
-    bsl r5 r5 4
-    or r4 r4 r5
-    brp ~+2 r6
-        neg r4 r4
-ret
