@@ -1,0 +1,424 @@
+minreg 7
+bits == 8
+minstack 14
+
+.camPos
+    DW [ 0b0100_1000 0b0011_1000 0b0110_1000 ] //x, y, z, in XXXX.XXXX format
+.camDir
+    DW [ 0b00_000000 0b00_000000 0b11_000000 ] //x, y, z, in SX.XXXXXX format
+
+//the blockgrid is just here for testing purposes
+.blockGrid
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+    DW [ 0b_1_1_1_1_1_1_1_1 ]
+
+    DW [ 0b_1_1_1_1_1_1_1_0 ]
+    DW [ 0b_1_1_1_1_1_1_0_0 ]
+    DW [ 0b_1_1_1_1_1_1_0_0 ]
+    DW [ 0b_1_1_1_1_1_1_0_0 ]
+    DW [ 0b_1_1_1_1_1_0_0_0 ]
+    DW [ 0b_1_1_1_1_1_0_0_0 ]
+    DW [ 0b_1_1_1_1_0_0_0_0 ]
+    DW [ 0b_1_1_1_0_0_0_0_0 ]
+
+    DW [ 0b_1_1_1_1_0_0_0_0 ]
+    DW [ 0b_1_1_1_0_0_0_0_0 ]
+    DW [ 0b_1_1_0_0_1_0_0_0 ]
+    DW [ 0b_1_1_0_0_0_0_0_0 ]
+    DW [ 0b_1_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_1_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_1_1_1_1_1_0 ]
+    DW [ 0b_0_0_0_1_1_1_1_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_1_1_0_0_0 ]
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_1_0_0_0 ]
+    DW [ 0b_0_0_0_1_1_1_0_0 ]
+    DW [ 0b_0_0_0_0_1_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+    DW [ 0b_0_0_0_0_0_0_0_0 ]
+//end blockGrid
+
+//this code just calls .rayCast and outputs the result
+    psh r0
+    psh r0
+    psh r0
+    psh r0
+    cal .rayCast
+
+    pop r1
+    bsr r2 r1 4
+    out %int r2
+    out %text ' '
+    and r1 r1 0b0000_0111
+    out %int r1
+    out %text ' '
+    pop r1
+    bsr r2 r1 4
+    out %int r2
+    out %text ':'
+    out %text ' '
+    and r1 r1 0b0000_0111
+    out %int r1
+    out %text '\n'
+    pop r1
+    bsr r2 r1 4
+    out %int r2
+    out %text ' '
+    and r1 r1 0b0000_0111
+    out %int r1
+    out %text ' '
+    pop r1
+    bsr r2 r1 4
+    out %int r2
+    out %text ':'
+    out %text ' '
+    and r1 r1 0b0000_0111
+    out %int r1
+
+hlt
+
+
+//getBlock function
+    //description:
+        //fetches the blockID at the specified location
+    //inputs:
+        //SP+2: x, y in XXXX_YYYY format
+        //SP+3: z in ZZZZ_0000 format
+    //outputs:
+        //SP+3: blockId in 0000_IIII format (keeps z in first 4 bits)
+    //storage used:
+        //r1 - r3, preexisting values preserved
+.getBlock
+    //NOTE: this is a temporary getBlock function for testing purposes
+    lstr sp -1 r1 //save the values of r1 - r3
+    lstr sp -2 r2
+    lstr sp -3 r3
+
+    llod r1 sp 2
+    and r2 r1 0b0000_1111 //Y
+    bne ~+3 r2 0b0000_1111 //if Y exactly -1, return bedrock
+        imm r1 1
+        jmp .getBlockEnd
+    brl ~+3 r2 8 //if out of bounds return air
+        imm r1 0
+        jmp .getBlockEnd
+    bsr r1 r1 4 //X
+    brl ~+3 r1 8 //if out of bounds return air
+        imm r1 0
+        jmp .getBlockEnd
+    bsl r2 r2 3 //Y*8
+    llod r3 sp 3 //Z*16
+    bsr r3 r3 4 //Z
+    brl ~+3 r3 8 //if out of bounds return air
+        imm r1 0
+        jmp .getBlockEnd
+    add r2 r2 r3 //Y*8 + Z
+    llod r2 .blockGrid r2 //block row
+    bsl r1 r2 r1
+    and r1 r1 0b10000000 //block type
+    bsr r1 r1 7
+
+    .getBlockEnd
+        llod r2 sp 3 //Z
+        or r1 r1 r2 //combine Z and ID
+        lstr sp 3 r1
+
+        llod r3 sp -3 //restore r1 - r3
+        llod r2 sp -2
+        llod r1 sp -1
+
+ret
+
+
+//rayCast function
+    //description:
+        //casts a ray from the position and direction of the camera, then 
+    //inputs:
+        //.camPos in XXXX.XXXX format
+        //.camDir in SX.XXXXXX format
+        @define RAYCASTMAXLENGTH 0b0100_0000
+    //outputs:
+        //SP+1: x, y, of first found block in 0XXX_0YYY format
+        //SP+2: z, id of first found block in 0ZZZ_IIII format. If no block found, id will be 0000
+        //SP+3: x, y, of block before found block in 0XXX_0YYY format
+        //SP+4: z of block before found block in 0ZZZ_0000 format
+    //storage used:
+        //r1 - r7
+.rayCast
+
+    llod r1 .camPos 0 //camX
+    and r5 r1 0b0000_1111 //cam x pos in block
+    and r1 r1 0b0111_0000 //start voxel x
+    llod r2 .camPos 1 //camY
+    and r6 r2 0b0000_1111 //cam y pos in block
+    bsr r2 r2 4 //start voxel y
+    or r1 r1 r2 //start voxel xy
+    lstr sp 1 r1 //store start voxel xy in SP+3
+    llod r1 .camPos 2 //camZ
+    and r7 r1 0b0000_1111 //cam z pos in block
+    and r1 r1 0b0111_0000 //start voxel z
+    lstr sp 2 r1 //store start voxel z in SP+4
+
+    //TODO: convert the following repeated code segment into a loop?
+
+    llod r1 .camDir 0 //camDirX
+    brn ~+3 r1 //if camDirX positive:
+        sub r5 0b0001_0000 r5 //swap X distance to edge of block direction
+        jmp ~+2
+    //if camDirX negative:
+        neg r1 r1
+    psh r1 //camDirX
+    psh r5 //distEdgeX
+    cal .rayCastDiv //calculate tMaxX
+    pop r5 //tMaxX
+    //keep camDirX on stack for next div
+    psh 0b0001_0000
+    cal .rayCastDiv //calculate tDeltaX
+    //keep values on stack
+        //SP+0: tDeltaX
+        //SP+1: junk
+
+
+    llod r1 .camDir 1 //camDirY
+    brn ~+3 r1 //if camDirY positive:
+        sub r6 0b0001_0000 r6  //swap y distance to edge of block direction
+        jmp ~+2
+    //if camDirY negative:
+        neg r1 r1
+    psh r1 //camDirY
+    psh r6 //distEdgeY
+    cal .rayCastDiv //calculate tMaxY
+    pop r6 //tMaxY
+    //keep camDirY on stack for next div
+    psh 0b0001_0000
+    cal .rayCastDiv //calculate tDeltaY
+    //keep values on stack
+        //SP+0: tDeltaY
+        //SP+1: junk
+        //SP+2: tDeltaX
+        //SP+3: junk
+
+
+    llod r1 .camDir 2 //camDirZ
+    brn ~+3 r1 //if camDirZ positive:
+        sub r7 0b0001_0000 r7  //swap z distance to edge of block direction
+        jmp ~+2
+    //if camDirZ negative:
+        neg r1 r1
+    psh r1 //camDirZ
+    psh r7 //distEdgeZ
+    cal .rayCastDiv //calculate tMaxZ
+    pop r7 //tMaxZ
+    //keep camDirZ on stack for next div
+    psh 0b0001_0000
+    cal .rayCastDiv //calculate tDeltaZ
+
+
+    //pop all values from stack
+        pop r4 //tDeltaZ
+        pop r0
+        pop r3 //tDeltaY
+        pop r0
+        pop r2 //tDeltaX
+        pop r0
+    
+    .rayCastLoop
+        //move currentBlock to previousBlock
+        llod r1 sp 1
+        lstr sp 3 r1
+        llod r1 sp 2
+        lstr sp 4 r1
+
+        brg .rayCastDontStepX r5 r6 //if (tMaxX <= tMaxY) {rayCastDontStepX()}
+            brg .rayCastStepZ r5 r7 //if (tMaxX <= tMaxZ) && (tMaxX <= tMaxY) {rayCastStepX()}
+            
+                .rayCastStepX
+
+                    ble ~+2 r5 RAYCASTMAXLENGTH
+                        ret //if t is longer than max length, end raycast
+
+                    llod r1 .camDir 0 //load camDirX so we know which direction to step in
+                    brn ~+4 r1 //if camDirX is positive:
+                        llod r1 sp 1
+                        add r1 r1 0b0001_0000 //increment x
+                    jmp ~+3 //if camDirX is negative:
+                        llod r1 sp 1
+                        sub r1 r1 0b0001_0000 //decrement x
+                    lstr sp 1 r1
+
+                    
+                    //fetch the new block
+                    cal .getBlock
+                    llod r1 sp 2
+                    and r1 r1 0b0000_1111 //isolate block id
+                    brz ~+2 r1
+                        ret  //if block is not air, end raycast //TODO: for Redstone, more checks are needed
+
+                    add r5 r5 r2 //add tDeltaX to next tMaxX
+
+                jmp .rayCastLoop
+
+                .rayCastStepZ
+
+                    ble ~+2 r7 RAYCASTMAXLENGTH
+                        ret //if t is longer than max length, end raycast
+                    
+                    llod r1 .camDir 2 //load camDirZ so we know which direction to step in
+                    brn ~+4 r1 //if camDirX is positive:
+                        llod r1 sp 2
+                        add r1 r1 0b0001_0000 //increment z
+                    jmp ~+3 //if camDirX is negative:
+                        llod r1 sp 2
+                        sub r1 r1 0b0001_0000 //decrement z
+                    lstr sp 2 r1
+                    
+                    //fetch the new block
+                    cal .getBlock
+                    llod  r1 sp 2
+                    and r1 r1 0b0000_1111 //isolate block id
+                    brz ~+2 r1
+                        ret //if block is not air, end raycast //TODO: for Redstone, more checks are needed
+
+                    add r7 r7 r4 //add tDeltaZ to next tMaxZ
+
+                jmp .rayCastLoop
+
+            .rayCastDontStepX
+            brg .rayCastStepZ r6 r7
+
+                .rayCastStepY
+                    ble ~+2 r6 RAYCASTMAXLENGTH
+                        ret //if t is longer than max length, end raycast
+                    
+                    llod r1 .camDir 1 //load camDirY to so we know which direction to step in
+                    brn ~+4 r1 //if camDirY is positive:
+                        llod r1 sp 1
+                        add r1 r1 0b0000_0001 //increment y
+                    jmp ~+3 //if camDirY is negative:
+                        llod r1 sp 1
+                        sub r1 r1 0b0000_0001 //decrement y
+                    lstr sp 1 r1
+
+                    //fetch the new block
+                    cal .getBlock
+                    llod  r1 sp 2
+                    and r1 r1 0b0000_1111 //isolate block id
+                    brz ~+2 r1
+                        ret //if block is not air, end raycast //TODO: for Redstone, more checks are needed
+                    
+                    add r6 r6 r3 //add tDeltaY to next tMaxY
+                
+                jmp .rayCastLoop
+//end rayCast function
+
+//rayCastDiv function
+    //description: divides two unsigned fixed point numbers, in the below format
+    //inputs:
+        //SP+1: numerator, 0000.0000 <= x <= 0111.1111
+        //SP+2: demoninator, 00.000000 <= x <= 01.111111
+    //outputs:
+        //SP+1: result, XXXX.XXXX
+    //storage used:
+        //r1 - r4
+.rayCastDiv
+
+    llod r1 sp 1 //0000.0000 <= x <= 0001.0000 numerator
+    llod r2 sp 2 //00.000000 <= x <= 01.000000 denominator
+
+    div r3 r1 r2 //result
+    //div note: in URCX behavior, this won't catch overflow, but in CHUNGUS it will.
+    mod r1 r1 r2 //remainder
+
+    imm r4 6 //loop exactly 6 times
+    .rayCastDivLoop
+        lsh r3 r3
+        brp ~+3 r3 //alternatively, use branch if no carry flag from above lsh
+            lstr sp 1 @msb //when overflow, return @msb instead of @max to make later parts of the program easier
+            ret
+        lsh r1 r1
+        brl ~+3 r1 r2
+            sub r1 r1 r2
+            inc r3 r3
+        dec r4 r4
+    bnz .rayCastDivLoop r4
+
+    lstr sp 1 r3
+
+ret
+
+/*
+//this segment not necessary. It's slightly faster that using only divs, might be useful if there is space left.
+//rayCastMult function
+    //description
+        //multiplies an unsigned fixed point value with another unsigned fixed point value between 0 and 1
+    //inputs:
+        //SP+1: factor 1, 0000.0000 <= x <= 0001.0000
+        //SP+2: factor 2, 0001.0000 <= x <= 0111.1111
+    //outputs:
+        //SP+1: product, XXXX.XXXX
+    //storage used:
+        //r1 - r4
+.rayCastMult
+
+    llod r1 sp 1
+    llod r2 sp 2
+
+    mov r3 r0
+
+    imm r4 4 //loop exactly 4 times
+    .rayCastMultLoop
+        bev ~+2 r1
+            add r3 r3 r2
+        rsh r3 r3
+        rsh r1 r1
+        dec r4 r4
+    bnz .rayCastMultLoop r4
+
+    lstr sp 1 r3
+
+ret
+*/
