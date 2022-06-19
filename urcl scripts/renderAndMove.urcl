@@ -10,6 +10,7 @@ minstack 5
         @define PLAYERHEIGHT 28 //technically it's 29, but 28 makes calculations easier
         @define HALFPLAYERWIDTH 5
         @define PLAYERCAMHEIGHT 24
+        @define PLAYERWIDTHFULL 10
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -88,10 +89,6 @@ out %playerinput r0 //synchronize playerInput device
             in r0 %playerinput //is place pressed?
 
             in r1 %playerinput //is crouch pressed?
-            //# brz ~+4 r1 //this code moves the player down when shifting
-            //#     lod r1 y
-            //#     sub r1 r1 8
-            //#     str y r1
 
         //handle rotation inputs
             in r1 %playerinput //rotation
@@ -115,21 +112,59 @@ out %playerinput r0 //synchronize playerInput device
             smlt446 r6 r1 r2
             add r5 r5 r6 //r5 = velZ
 
-            smlt446 r5 r1 r3
+            smlt446 r6 r1 r3
             add r4 r4 r6 //r4 = velX
-        
-        //TODO: move and collide in X and Z axes
+
+            psh r5 //stack 0 = velZ
             psh r4 //stack 1 = velX
-            psh r5 //stack 2 = velZ
-            lod r1 x
-            add r1 r1 r4
-            bsr r1 r1 4 //r1 = minX
-            lod r2 y
-            bsr r2 r2 4 //r2 = minY
-            lod r3 z
-            add r3 r3 r5
-            bsr r3 r3 4 //r3 = minZ
-                    
+        
+        //move and collide in X axis
+            lod r2 x
+            add r1 r2 r4 //r1 = minX
+            bsr r2 r2 4
+            bsr r3 r1 4
+            bre .collideZ r2 r3 //if block X doesn't change with move, don't check X collision
+            brn ~+2 r4 //if velocity negative, use -x side of player to collide. Otherwise use +x side
+                add r1 r1 PLAYERWIDTH //r1 = maxX
+            and r1 r1 0xf0 //floor(x) << 4
+            lod r2 y //r2 = minY
+            add r3 r2 PLAYERHEIGHT //r3 = maxY
+            bsr r2 r2 4 //r2 = floor(minY)
+            bsr r3 r3 4 //r3 = floor(maxY)
+            lod r4 z //r4 = minZ
+            add r5 r4 PLAYERWIDTH //r5 = maxZ
+            bsr r4 r4 4 //floor(minZ)
+            bsr r5 r5 4 //floor(maxZ)
+            .collideXLoopY
+                mov r6 r4
+                or r1 r1 r2 //combine X and Y to one register to send to %blockram
+                out %blockram_xy r1
+                .collideXLoopZ
+                    out %blockram_z r6
+                    in r7 %blockram_id
+                    brz .collideXNoCollision r7 //if air or sapling, do not collide with this block
+                    bre .collideXNoCollision r7 BLOCK_SAPLING //if air or sapling, do not collide with this block
+                    //collision detected
+                        pop r2
+                        brp ~+3 r2 //velocity is negative, resolve collision towards +x
+                            add r1 r1 BLOCKSIZE
+                            jmp ~+2
+                        //velocity is positive, resolve collision towards -x
+                            sub r1 r1 PLAYERWIDTHFULL
+                        str x r1
+                        jmp .collideZ
+                    .collideXNoCollision
+                    inc r6 r6
+                ble .collideXLoopZ r6 r5
+                inc r2 r2
+                and r1 r1 0xf0 //separate X and Y
+            ble .collideXLoopY r2 r3
+
+
+        .collideZ //TODO: move and collide in Z axis
+            //current useful variables:
+                //stack contains velZ
+
 
         //TODO: handle jumping and move and collide in Y
             //# in r1 %playerinput //is jump pressed
