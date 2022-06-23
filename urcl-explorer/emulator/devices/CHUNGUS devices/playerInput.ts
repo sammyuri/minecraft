@@ -28,12 +28,12 @@ export class PlayerInput implements Device {
         [IO_Port.PLAYERINPUT]: () => {
             if (this.queue.length == 0) {
                 let output = 0;
+                this.queue.push(0); //TODO: open/close inventory pressed
+                this.queue.push(0);//TODO: inventory movement
 
-                this.queue[0] = 0 //TODO: inventory movement
-
-                this.queue[1] = this.keys.break ? 1 : 0;
-                this.queue[2] = this.keys.use ? 1 : 0;
-                this.queue[3] = this.keys.crouch ? 1 : 0;
+                this.queue.push(this.keys.break ? 1 : 0);
+                this.queue.push(this.keys.use ? 1 : 0);
+                this.queue.push(this.keys.crouch ? 1 : 0);
 
                 output = 0;
                 if (this.keys.look_up) {
@@ -50,26 +50,28 @@ export class PlayerInput implements Device {
                 } else {
                     output |= 0;
                 }
-                this.queue[4] = output;
+                this.queue.push(output);
                 
-                let speed = this.keys.crouch ? 1 : 2;
+                let speed = this.keys.crouch ? 4 : 8;
                 if (this.keys.move_forward) {
-                    this.queue[5] = (speed + (this.keys.sprint && !this.keys.crouch ? 1 : 0));
+                    this.queue.push(speed + (this.keys.sprint && !this.keys.crouch ? 4 : 0));
                 } else if (this.keys.move_backward) {
-                    this.queue[5] = -speed & 0xFF;
+                    this.queue.push(-speed & 0xFF);
                 } else {
-                    this.queue[5] = 0;
+                    this.queue.push(0);
                 }
 
                 if (this.keys.move_left) {
-                    this.queue[6] = -speed & 0xFF;
+                    this.queue.push(-speed & 0xFF);
                 } else if (this.keys.move_right) {
-                    this.queue[6] = speed;
+                    this.queue.push(speed);
                 } else {
-                    this.queue[6] = 0;
+                    this.queue.push(0);
                 }
 
-                this.queue[7] = this.keys.jump ? 1 : 0;
+                this.queue.push(this.keys.jump ? 1 : 0);
+                
+                this.queue.push(0); //TODO: drop item pressed
 
                 return 0;
             } else {

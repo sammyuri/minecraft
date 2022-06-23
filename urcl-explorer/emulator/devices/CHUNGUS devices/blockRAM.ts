@@ -95,7 +95,7 @@ export class BlockRAM implements Device {
             this.y = i & 0x0F;
         },
         [IO_Port.BLOCKRAM_Z]: (i:number) => {
-            this.z = i >> 4;
+            this.z = i;
         },
 		[IO_Port.BLOCKRAM_ID]: (i:number) => {
 			let id = i;
@@ -110,7 +110,8 @@ export class BlockRAM implements Device {
 
     inputs = {
         [IO_Port.BLOCKRAM_ID]: () => {
-            return this.getBlock(this.x, this.y, this.z);
+            let id = this.getBlock(this.x, this.y, this.z);
+			return id;
         },
         [IO_Port.BLOCKRAM_ZI]: () => {
             return (this.z << 4) | this.getBlock(this.x, this.y, this.z);

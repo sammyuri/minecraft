@@ -323,18 +323,18 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
         if (num & 0x55555555) trailingZeros -= 1;
         s.a = trailingZeros;
     }],
-    [Opcode.BTC  ]: [[SET, GET     ], (s) => { //bit count
+    [Opcode.BTC  ]: [[SET, GET,     ], (s) => { //bit count
         let num = s.b - ((s.b >> 1) & 0x55555555);
         num = (num & 0x33333333) + ((num >> 2) & 0x33333333);
         s.a = (( num + (num >> 4) & 0x0f0f0f0f) * 0x01010101) >> 24;
     }],
-    [Opcode.SMLT446]: [[SET, GET   ], (s) => {
+    [Opcode.SMLT446]: [[SET, GET, GET], (s) => {
         s.a = (s.sb / 16) * (s.sc / 64) * 16;
     }],
-    [Opcode.SDIV444]: [[SET, GET   ], (s) => {
+    [Opcode.SDIV444]: [[SET, GET, GET], (s) => {
         s.a = (s.sb / 16) / (s.sc / 16) * 16;
     }],
-    [Opcode.SDIV446]: [[SET, GET   ], (s) => {
+    [Opcode.SDIV446]: [[SET, GET, GET], (s) => {
         s.a = (s.sb / 16) / (s.sc / 64) * 16;
     }]
 };

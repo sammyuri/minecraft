@@ -88,6 +88,9 @@ export var Opcode;
     Opcode[Opcode["CLZ"] = 76] = "CLZ";
     Opcode[Opcode["CTZ"] = 77] = "CTZ";
     Opcode[Opcode["BTC"] = 78] = "BTC";
+    Opcode[Opcode["SMLT446"] = 79] = "SMLT446";
+    Opcode[Opcode["SDIV444"] = 80] = "SDIV444";
+    Opcode[Opcode["SDIV446"] = 81] = "SDIV446";
 })(Opcode || (Opcode = {}));
 export var Register;
 (function (Register) {
@@ -479,6 +482,15 @@ export const Opcodes_operants = {
             let num = s.b - ((s.b >> 1) & 0x55555555);
             num = (num & 0x33333333) + ((num >> 2) & 0x33333333);
             s.a = ((num + (num >> 4) & 0x0f0f0f0f) * 0x01010101) >> 24;
+        }],
+    [Opcode.SMLT446]: [[SET, GET, GET], (s) => {
+            s.a = (s.sb / 16) * (s.sc / 64) * 16;
+        }],
+    [Opcode.SDIV444]: [[SET, GET, GET], (s) => {
+            s.a = (s.sb / 16) / (s.sc / 16) * 16;
+        }],
+    [Opcode.SDIV446]: [[SET, GET, GET], (s) => {
+            s.a = (s.sb / 16) / (s.sc / 64) * 16;
         }]
 };
 export const inst_fns = object_map(Opcodes_operants, (key, value) => {
