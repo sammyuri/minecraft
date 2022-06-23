@@ -120,6 +120,7 @@ str rot 0x00
             psh r5 //stack 0 = velZ
             psh r4 //stack 1 = velX
         
+        //TODO: convert the following into a callable function that can be used for both the X and Z axes instead of using duplicate code.
         //move and collide in X axis
             //current useful variables
                 //r4 = velX
@@ -171,6 +172,7 @@ str rot 0x00
                 pop r0 //remove velX from stack if it isn't already removed
         .collideXEnd
 
+        //TODO: see previous TODO
         //move and collide in Z axis
             //current useful variables:
                 //top of stack = velZ
