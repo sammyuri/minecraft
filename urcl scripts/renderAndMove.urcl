@@ -1,7 +1,7 @@
 bits == 8
 minreg 7
 minheap 4
-minstack 5
+minstack 2
 
 //constants
     //general constants
@@ -70,25 +70,27 @@ minstack 5
     @define rot m3
 
 //initial values
-str x 0x18
-str y 0x38
-str z 0x18
+str x 0x10
+str y 0x20
+str z 0x10
 str rot 0x00
 
-out %playerinput r0 //synchronize playerInput device
+
 
 .loop
+    out %playerinput r0 //synchronize playerInput device
 
     //handle inputs
 
         in r0 %playerinput //get input
 
         //handle miscellaneous inputs
+            in r0 %playerinput //is open/close inventory pressed?
             in r0 %playerinput //inventory movement
             in r0 %playerinput //is break pressed?
             in r0 %playerinput //is place pressed?
 
-            in r1 %playerinput //is crouch pressed?
+            in r0 %playerinput //is crouch pressed?
 
         //handle rotation inputs
             in r1 %playerinput //rotation
@@ -101,7 +103,7 @@ out %playerinput r0 //synchronize playerInput device
             in r1 %playerinput //forward movement
 
             in r2 %amogus_sinyaw
-            neg r3 r3
+            neg r3 r2
             smlt446 r4 r1 r3 //r3 = velX
 
             in r3 %amogus_cosyaw
@@ -119,13 +121,18 @@ out %playerinput r0 //synchronize playerInput device
             psh r4 //stack 1 = velX
         
         //move and collide in X axis
+            //current useful variables
+                //r4 = velX
+                //top of stack = velX
             lod r2 x
             add r1 r2 r4 //r1 = minX
-            bsr r2 r2 4
-            bsr r3 r1 4
-            bre .collideZ r2 r3 //if block X doesn't change with move, don't check X collision
-            brn ~+2 r4 //if velocity negative, use -x side of player to collide. Otherwise use +x side
+            str x r1
+            brn ~+3 r4 //if velocity negative, use -x side of player to collide. Otherwise use +x side
                 add r1 r1 PLAYERWIDTH //r1 = maxX
+                add r2 r2 PLAYERWIDTH //r2 - maxPrevX
+            bsr r2 r2 4 //floor(prevX)
+            bsr r3 r1 4 //floor(currentX)
+            bre .collideXEndCleanup r2 r3 //if block X doesn't change with move, don't check X collision
             and r1 r1 0xf0 //floor(x) << 4
             lod r2 y //r2 = minY
             add r3 r2 PLAYERHEIGHT //r3 = maxY
@@ -137,36 +144,85 @@ out %playerinput r0 //synchronize playerInput device
             bsr r5 r5 4 //floor(maxZ)
             .collideXLoopY
                 mov r6 r4
-                or r1 r1 r2 //combine X and Y to one register to send to %blockram
-                out %blockram_xy r1
+                or r7 r1 r2 //combine X and Y to one register to send to %blockram
+                out %blockram_xy r7
                 .collideXLoopZ
                     out %blockram_z r6
                     in r7 %blockram_id
-                    brz .collideXNoCollision r7 //if air or sapling, do not collide with this block
-                    bre .collideXNoCollision r7 BLOCK_SAPLING //if air or sapling, do not collide with this block
+                    brz .collideXNoCollision r7 //if air, do not collide with this block
+                    bre .collideXNoCollision r7 BLOCK_SAPLING //if sapling, do not collide with this block
                     //collision detected
-                        pop r2
+                        pop r2 //r2 = velX
                         brp ~+3 r2 //velocity is negative, resolve collision towards +x
                             add r1 r1 BLOCKSIZE
                             jmp ~+2
                         //velocity is positive, resolve collision towards -x
                             sub r1 r1 PLAYERWIDTHFULL
                         str x r1
-                        jmp .collideZ
+                        jmp .collideXEnd //once a single collision is found, we don't need to check for any more
+                        //cleanup already done
                     .collideXNoCollision
                     inc r6 r6
                 ble .collideXLoopZ r6 r5
                 inc r2 r2
                 and r1 r1 0xf0 //separate X and Y
             ble .collideXLoopY r2 r3
+            .collideXEndCleanup
+                pop r0 //remove velX from stack if it isn't already removed
+        .collideXEnd
 
-
-        .collideZ //TODO: move and collide in Z axis
+        //move and collide in Z axis
             //current useful variables:
-                //stack contains velZ
-
+                //top of stack = velZ
+            lod r2 z
+            lod r4 sp //velZ
+            add r1 r2 r4 //r1 = minZ
+            str z r1
+            brn ~+3 r4 //if velocity negative, use -z side of player to collide. Otherwise use +z side
+                add r1 r1 PLAYERWIDTH //r1 = maxZ
+                add r2 r2 PLAYERWIDTH //r2 = maxPrevZ
+            bsr r2 r2 4 //floor(prevZ)
+            bsr r3 r1 4 //floor(currentZ)
+            bre .collideZEndCleanup r2 r3 //if block Z doesn't change with move, don't check z collisions
+            bsr r1 r1 4 //floor(z)
+            lod r2 y
+            add r3 r2 PLAYERHEIGHT
+            bsr r2 r2 4
+            bsr r3 r3 4
+            lod r4 x
+            add r5 r4 PLAYERWIDTH
+            and r4 r4 0xf0
+            and r5 r5 0xf0
+            out %blockram_z r1
+            .collideZLoopY
+                mov r6 r4
+                .collideZLoopX
+                    or r7 r6 r2 //combine X and Y together to send to %blockram
+                    out %blockram_xy r7
+                    in r7 %blockram_id
+                    brz .collideZNoCollision r7
+                    bre .collideZNoCollision r7 BLOCK_SAPLING
+                    //collision detected
+                        pop r2 //velZ
+                        bsl r1 r1 4
+                        brp ~+3 r2 //velocity is negative, resolve collision towards +z
+                            add r1 r1 BLOCKSIZE
+                            jmp ~+2
+                        //velocity is positive, resolve collision towards -z
+                            sub r1 r1 PLAYERWIDTHFULL
+                        str z r1
+                        jmp .collideZEnd
+                    .collideZNoCollision
+                    add r6 r6 BLOCKSIZE
+                ble .collideZLoopX r6 r5
+                inc r2 r2
+            ble .collideZLoopY r2 r3
+            .collideZEndCleanup
+                pop r0 //remove velZ from stack if it isn't alreadt removed
+        .collideZEnd
 
         //TODO: handle jumping and move and collide in Y
+            in r0 %playerinput //is jump pressed?
             //# in r1 %playerinput //is jump pressed
             //# brz ~+4 r1
             //#     mov r3 0 //Y velocity if no jump
@@ -174,6 +230,8 @@ out %playerinput r0 //synchronize playerInput device
             //#     and r1 r1 0x0F
             //#     brz ~+2 r1 //check if on ground
             //#         imm r3 17 //Y velocity upon jump.
+        
+        in r0 %playerinput //is drop item pressed?
 
     //do rendering stuff
         //send camera data to AMOGUS
