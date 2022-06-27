@@ -22,7 +22,7 @@ import { Amogus } from "./emulator/devices/CHUNGUS devices/amogus.js";
 import { Screen } from "./emulator/devices/CHUNGUS devices/screen.js";
 
 let animation_frame: number | undefined;
-let running = false;
+export let running = false;
 let started = false;
 let input = false;
 let last_step = performance.now();

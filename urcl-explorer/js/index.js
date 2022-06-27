@@ -20,7 +20,7 @@ import { MeshGen } from "./emulator/devices/CHUNGUS devices/blockToMesh.js";
 import { Amogus } from "./emulator/devices/CHUNGUS devices/amogus.js";
 import { Screen } from "./emulator/devices/CHUNGUS devices/screen.js";
 let animation_frame;
-let running = false;
+export let running = false;
 let started = false;
 let input = false;
 let last_step = performance.now();

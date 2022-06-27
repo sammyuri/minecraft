@@ -1,4 +1,5 @@
 import { IO_Port } from "../../instructions.js";
+import { running } from "../../../index.js";
 export class PlayerInput {
     constructor() {
         this.keys = {
@@ -80,6 +81,9 @@ export class PlayerInput {
             }
         };
         addEventListener("keydown", (e) => {
+            if (running) {
+                e.preventDefault();
+            }
             switch (e.key) {
                 case "Control":
                     this.keys.sprint = true;
@@ -123,6 +127,9 @@ export class PlayerInput {
             }
         });
         addEventListener("keyup", (e) => {
+            if (running) {
+                e.preventDefault();
+            }
             switch (e.key) {
                 case "Control":
                     this.keys.sprint = false;
