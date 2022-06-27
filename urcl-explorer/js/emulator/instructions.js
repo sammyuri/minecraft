@@ -229,10 +229,11 @@ export var IO_Port;
     //player input
     IO_Port[IO_Port["PLAYERINPUT"] = 65] = "PLAYERINPUT";
     //block RAM
-    IO_Port[IO_Port["BLOCKRAM_XY"] = 66] = "BLOCKRAM_XY";
-    IO_Port[IO_Port["BLOCKRAM_Z"] = 67] = "BLOCKRAM_Z";
-    IO_Port[IO_Port["BLOCKRAM_ID"] = 68] = "BLOCKRAM_ID";
-    IO_Port[IO_Port["BLOCKRAM_ZI"] = 69] = "BLOCKRAM_ZI";
+    IO_Port[IO_Port["BLOCKRAM_X"] = 66] = "BLOCKRAM_X";
+    IO_Port[IO_Port["BLOCKRAM_Y"] = 67] = "BLOCKRAM_Y";
+    IO_Port[IO_Port["BLOCKRAM_Z"] = 68] = "BLOCKRAM_Z";
+    IO_Port[IO_Port["BLOCKRAM_ZI"] = 68] = "BLOCKRAM_ZI";
+    IO_Port[IO_Port["BLOCKRAM_ID"] = 69] = "BLOCKRAM_ID";
     //blockToMesh
     IO_Port[IO_Port["MESHGEN_BLOCKXY"] = 70] = "MESHGEN_BLOCKXY";
     IO_Port[IO_Port["MESHGEN_BLOCKZ"] = 71] = "MESHGEN_BLOCKZ";
