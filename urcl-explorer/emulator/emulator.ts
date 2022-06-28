@@ -121,11 +121,13 @@ export class Emulator implements Instruction_Ctx, Device_Host {
     registers: WordArray = new Uint8Array(32);
     memory: WordArray = new Uint8Array(256);
     pc_counters: number[] = [];
+    pc_full = 0;
     get pc(){
-        return this.registers[Register.PC];
+        return this.pc_full;
     }
     set pc(value: Word){
         this.registers[Register.PC] = value;
+        this.pc_full = value;
     }
     get stack_ptr(){
         return this.registers[Register.SP];
