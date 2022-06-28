@@ -316,9 +316,9 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
         let trailingZeros = 32;
         let num = s.b & -s.b;
         if (num) trailingZeros--;
-        if (num & 0x0000FFFF) trailingZeros -= 16;
-        if (num & 0x00FF00FF) trailingZeros -= 8;
-        if (num & 0x0F0F0F0F) trailingZeros -= 4;
+        if (num & 0x0000ffff) trailingZeros -= 16;
+        if (num & 0x00ff00ff) trailingZeros -= 8;
+        if (num & 0x0f0f0f0f) trailingZeros -= 4;
         if (num & 0x33333333) trailingZeros -= 2;
         if (num & 0x55555555) trailingZeros -= 1;
         s.a = trailingZeros;
@@ -332,10 +332,10 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
         s.a = (s.sb / 16) * (s.sc / 64) * 16;
     }],
     [Opcode.SDIV444]: [[SET, GET, GET], (s) => {
-        s.a = (s.sb / 16) / (s.sc / 16) * 16;
+        s.a = (s.c != 0) ? ((s.sb / 16) / (s.sc / 16) * 16) : ((s.b >= 0) ? 0x7f : 0xff);
     }],
     [Opcode.SDIV446]: [[SET, GET, GET], (s) => {
-        s.a = (s.sb / 16) / (s.sc / 64) * 16;
+        s.a = (s.c != 0) ? ((s.sb / 16) / (s.sc / 64) * 16) : ((s.b >= 0) ? 0x7f : 0xff);
     }]
 };
 

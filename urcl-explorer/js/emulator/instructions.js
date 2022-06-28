@@ -467,11 +467,11 @@ export const Opcodes_operants = {
             let num = s.b & -s.b;
             if (num)
                 trailingZeros--;
-            if (num & 0x0000FFFF)
+            if (num & 0x0000ffff)
                 trailingZeros -= 16;
-            if (num & 0x00FF00FF)
+            if (num & 0x00ff00ff)
                 trailingZeros -= 8;
-            if (num & 0x0F0F0F0F)
+            if (num & 0x0f0f0f0f)
                 trailingZeros -= 4;
             if (num & 0x33333333)
                 trailingZeros -= 2;
@@ -479,7 +479,7 @@ export const Opcodes_operants = {
                 trailingZeros -= 1;
             s.a = trailingZeros;
         }],
-    [Opcode.BTC]: [[SET, GET], (s) => {
+    [Opcode.BTC]: [[SET, GET,], (s) => {
             let num = s.b - ((s.b >> 1) & 0x55555555);
             num = (num & 0x33333333) + ((num >> 2) & 0x33333333);
             s.a = ((num + (num >> 4) & 0x0f0f0f0f) * 0x01010101) >> 24;
@@ -488,10 +488,10 @@ export const Opcodes_operants = {
             s.a = (s.sb / 16) * (s.sc / 64) * 16;
         }],
     [Opcode.SDIV444]: [[SET, GET, GET], (s) => {
-            s.a = (s.sb / 16) / (s.sc / 16) * 16;
+            s.a = (s.c != 0) ? ((s.sb / 16) / (s.sc / 16) * 16) : ((s.b >= 0) ? 0x7f : 0xff);
         }],
     [Opcode.SDIV446]: [[SET, GET, GET], (s) => {
-            s.a = (s.sb / 16) / (s.sc / 64) * 16;
+            s.a = (s.c != 0) ? ((s.sb / 16) / (s.sc / 64) * 16) : ((s.b >= 0) ? 0x7f : 0xff);
         }]
 };
 export const inst_fns = object_map(Opcodes_operants, (key, value) => {
