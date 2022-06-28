@@ -111,11 +111,13 @@ export class Emulator {
     registers = new Uint8Array(32);
     memory = new Uint8Array(256);
     pc_counters = [];
+    pc_full = 0;
     get pc() {
-        return this.registers[Register.PC];
+        return this.pc_full;
     }
     set pc(value) {
         this.registers[Register.PC] = value;
+        this.pc_full = value;
     }
     get stack_ptr() {
         return this.registers[Register.SP];
