@@ -88,6 +88,7 @@ export class BlockRAM implements Device {
     x = 0;
     y = 0;
     z = 0;
+	oobActive = false;
 
 	outputs = {
         [IO_Port.BLOCKRAM_X]: (i:number) => {
@@ -106,6 +107,12 @@ export class BlockRAM implements Device {
     }
 
     inputs = {
+		[IO_Port.BLOCKRAM_OOBACTIVE]: () => {
+			this.oobActive = true;
+		},
+		[IO_Port.BLOCKRAM_OOBINACTIVE]: () => {
+			this.oobActive = false;
+		},
         [IO_Port.BLOCKRAM_ID]: () => {
             let id = this.getBlock(this.x, this.y, this.z);
 			return id;
@@ -116,18 +123,19 @@ export class BlockRAM implements Device {
         }
     }
 
-	public getBlock(x:number, y:number, z:number):number {
+	public getBlock(x:number, y:number, z:number):Block {
 		if (0 <= x && x < 8) {
-			if (0 <= y && y < 8) {
-				if (0 <= z && z < 8) {
+			if (0 <= z && z < 8) {
+				if (0 <= y && y < 8) {
 					return this.blockGrid[y][7-z][x];
 				}
+				return Block.air;
 			}
 		}
-		return 0;
+		return this.oobActive ? -1 : Block.air
 	}
 
-	public setBlock(x:number, y:number, z:number, id:number) {
+	public setBlock(x:number, y:number, z:number, id:Block) {
 		if (0 <= x && x < 8) {
 			if (0 <= y && y < 8) {
 				if (0 <= z && z < 8) {

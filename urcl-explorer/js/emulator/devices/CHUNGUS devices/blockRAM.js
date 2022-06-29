@@ -87,6 +87,7 @@ export class BlockRAM {
         this.x = 0;
         this.y = 0;
         this.z = 0;
+        this.oobActive = false;
         this.outputs = {
             [IO_Port.BLOCKRAM_X]: (i) => {
                 this.x = i;
@@ -103,6 +104,14 @@ export class BlockRAM {
             }
         };
         this.inputs = {
+            [IO_Port.BLOCKRAM_OOBACTIVE]: () => {
+                this.oobActive = true;
+                return 0;
+            },
+            [IO_Port.BLOCKRAM_OOBINACTIVE]: () => {
+                this.oobActive = false;
+                return 0;
+            },
             [IO_Port.BLOCKRAM_ID]: () => {
                 let id = this.getBlock(this.x, this.y, this.z);
                 return id;
@@ -115,13 +124,14 @@ export class BlockRAM {
     }
     getBlock(x, y, z) {
         if (0 <= x && x < 8) {
-            if (0 <= y && y < 8) {
-                if (0 <= z && z < 8) {
+            if (0 <= z && z < 8) {
+                if (0 <= y && y < 8) {
                     return this.blockGrid[y][7 - z][x];
                 }
+                return Block.air;
             }
         }
-        return 0;
+        return this.oobActive ? -1 : Block.air;
     }
     setBlock(x, y, z, id) {
         if (0 <= x && x < 8) {

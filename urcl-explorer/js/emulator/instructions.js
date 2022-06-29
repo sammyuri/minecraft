@@ -230,7 +230,9 @@ export var IO_Port;
     IO_Port[IO_Port["PLAYERINPUT"] = 65] = "PLAYERINPUT";
     //block RAM
     IO_Port[IO_Port["BLOCKRAM_X"] = 66] = "BLOCKRAM_X";
+    IO_Port[IO_Port["BLOCKRAM_OOBACTIVE"] = 66] = "BLOCKRAM_OOBACTIVE";
     IO_Port[IO_Port["BLOCKRAM_Y"] = 67] = "BLOCKRAM_Y";
+    IO_Port[IO_Port["BLOCKRAM_OOBINACTIVE"] = 67] = "BLOCKRAM_OOBINACTIVE";
     IO_Port[IO_Port["BLOCKRAM_Z"] = 68] = "BLOCKRAM_Z";
     IO_Port[IO_Port["BLOCKRAM_ZI"] = 68] = "BLOCKRAM_ZI";
     IO_Port[IO_Port["BLOCKRAM_ID"] = 69] = "BLOCKRAM_ID";
