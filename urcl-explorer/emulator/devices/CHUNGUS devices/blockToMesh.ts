@@ -601,15 +601,15 @@ const MeshROM = {
         block: {
             textures: [
                 { //top
-                    id: Texture.cobble,
+                    id: Texture.stone,
                     settings: 0b1000 //Btio
                 },
                 { //bottom
-                    id: Texture.cobble,
+                    id: Texture.stone,
                     settings: 0b1000 //Btio
                 },
                 { //sides
-                    id: Texture.cobble,
+                    id: Texture.stone,
                     settings: 0b1000 //Btio
                 }
             ],
