@@ -97,7 +97,7 @@ export class Gl_Display implements Device {
             case ${Color_Mode.RGB16}u: color = rgb(c, 16u); break;
             case ${Color_Mode.RGB24}u: color = rgb(c, 24u); break;
             case ${Color_Mode.RGBI}u: color = rgbi(c); break;
-            default: color = pico8(c); break;
+            default: color = rgbi(c); break;
         }
     }
     
@@ -124,7 +124,7 @@ export class Gl_Display implements Device {
     
     constructor (
         gl: WebGL2RenderingContext,
-        public color_mode = Color_Mode.PICO8
+        public color_mode = Color_Mode.RGBI
     ){
         this.gl = gl;
         const {drawingBufferWidth: width, drawingBufferHeight: height} = gl;

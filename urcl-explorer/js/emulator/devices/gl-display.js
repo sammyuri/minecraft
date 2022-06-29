@@ -95,7 +95,7 @@ export class Gl_Display {
             case ${Color_Mode.RGB16}u: color = rgb(c, 16u); break;
             case ${Color_Mode.RGB24}u: color = rgb(c, 24u); break;
             case ${Color_Mode.RGBI}u: color = rgbi(c); break;
-            default: color = pico8(c); break;
+            default: color = rgbi(c); break;
         }
     }
     
@@ -118,7 +118,7 @@ export class Gl_Display {
         this.clear();
         this.buffer_enabled = 0;
     }
-    constructor(gl, color_mode = Color_Mode.PICO8) {
+    constructor(gl, color_mode = Color_Mode.RGBI) {
         this.color_mode = color_mode;
         this.gl = gl;
         const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;

@@ -29,7 +29,7 @@
                 <button id="compile-and-run-button">Compile and run</button>
                 <button id=step-button disabled>Step</button><br>
                 clock speed Hz <input type="number" id="clock-speed-input"> <output id="clock-speed-output"></output><br>
-                auto run <input type="checkbox" id="auto-run-input" checked> <br>
+                auto run <input type="checkbox" id="auto-run-input"> <br>
                 storage-file <input id="storage-input" type="file"> <span id="storage-msg"></span><br>
                 little endian <input id="storage-little" type="checkbox"><br>
                 <button id="storage-update"">Update storage</button>
@@ -81,7 +81,8 @@
                 </div>
                 <div style="width: 100%;">
                     color mode
-                    <select id="color-mode" value="PICO8">
+                    <select id="color-mode" value="RGBI">
+                        <option value="RGBI">RGBI</option>
                         <option value="PICO8">PICO8</option>
                         <option value="Mono">Mono</option>
                         <option value="Bin">Bin</option>
@@ -91,7 +92,6 @@
                         <option value="RGB16">RGB16</option>
                         <option value="RGB24">RGB24</option>
                         <option value="RGB">RGB</option>
-                        <option value="RGBI">RGBI</option>
                     </select>
                     <br>
                     width <input type="number" id="display-width" value="96"><br>
