@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 8
+minheap 29
 minstack 23
 
 //constants
@@ -12,7 +12,7 @@ minstack 23
         @define PLAYERCAMHEIGHT 24
         @define PLAYERCROUCHCAMHEIGHT 22
         @define MIDDLEOFVOID 0b1100_0000
-    //other constants
+    //gameplay constants
         @define GRAVITY 15 //the downwards change in velocity per frame
         @define JUMPSTRENGTH 17 //the initial vertical velocity of a jump
         @define SPEEDFACTOR 0b01_000000 //scales the speed of the characters movement. A value of 1 results in a speed of 4 while crouching, 8 while walking, and 12 while sprinting. In 0bSX.XXXXXX format
@@ -70,6 +70,7 @@ minstack 23
         @define ITEM_CHEST 0xFF
 
 //memory locations
+//NOTE: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
     @define x m0 //replace with 0x00 if 'm0' not supported in translator
     @define y m1
     @define z m2
@@ -78,6 +79,13 @@ minstack 23
     @define velY m5
     @define needReRender m6
     @define crouching m7
+    @define prevX m8
+    @define prevY m9
+    @define prevZ m10
+    @define targetedBlockXZ m11
+    @define targetedBlockY m12
+    @define inventory m13 //takes up 15 cells (m13-m27)
+    @define hotbarSlot m28
 
 //initial values
     str x 0x10
@@ -88,6 +96,11 @@ minstack 23
     str velY 0
     str needReRender @max
     str crouching 0
+    str prevX 0
+    str prevY 0
+    str prevZ 0
+    str targetedBlockXZ 0xff
+    str targetedBlockY 0xff
 
 .mainLoop
     out %playerinput r0 //synchronize playerInput device
@@ -99,33 +112,81 @@ minstack 23
         //handle miscellaneous inputs
             in r0 %playerinput //is open/close inventory pressed?
             in r0 %playerinput //inventory movement
-            in r0 %playerinput //is break pressed?
-            in r0 %playerinput //is place pressed?
+        
+        //handle break/place
+            cal .rayCast
+                //r1: x, z pos of space before first found block
+                //r2: y pos of space before first found block
+                //r3: x, z pos of first found block
+                //r4: y pos of first found block
+                //r5: id of first found block (returns air if nothing found, bedrock will return -1)
+                //r6: length of raycast (returns -1 if nothing found)
+            in r7 %playerinput //is break pressed?
+            lod r6 hotbarSlot
+            add r6 inventory r6 //r6 = pointer towards item in hand
+            lod r6 r6 //r6 = item in hand
+            brz .noRayCastHit r5
+            brz .endBreakBlock r7
+                brn .endBreakBlock r5 //if bedrock, can't break block
+                //TODO: use the item in hand
+                //TODO: add animation/block breaking delay
+                bsr r7 r3 4
+                out %blockram_x r7
+                and r7 r3 0x0f
+                out %blockram_z r7
+                out %blockram_y r4
+                //TODO: drop item entity
+                out %blockram_id 0 //replace targeted block with air
+                str needReRender @max
+                jmp .endBreakAndPlace
+            .endBreakBlock
+            in r7 %playerinput //is place pressed?
+            brz .endBreakAndPlace r7
+                lod r7 crouching
+                //TODO: check if targeted block is usable, if so, use it
+                //TODO: check if item in hand is usable without target, if so, jump to .useNonPlaceable
+                //TODO: check if item in hand is placeable, if so place it
+                bsr r7 r1 4
+                out %blockram_x r7
+                and r7 r1 0x0f
+                out %blockram_z r7
+                out %blockram_y r2
+                out %blockram_id BLOCK_GRASS //TODO: replace grass with whatever is currently held
+            jmp .endBreakAndPlace
+            .noRayCastHit
+                in r7 %playerinput //is place pressed?
+                //TODO: check if item in hand is usable without a target, if not, skip to .endBreakAndPlace
+            .useNonPlaceable
+                //TODO: use nonplaceable items
+        .endBreakAndPlace
 
+        //handle crouching inputs
             in r1 %playerinput //is crouch pressed?
-            str crouching 0
-            brz ~+2 r1
-                str crouching @max
-
+            lod r2 crouching
+            bre ~+3 r1 r2 //if crouching status changed:
+                str crouching r1
+                str needReRender r1
 
         //handle rotation inputs
             in r1 %playerinput //rotation
-
-            lod r2 rot
-            addv r1 r1 r2
-            str rot r1
+            brz ~+5 r1
+                lod r2 rot
+                addv r2 r1 r2
+                str rot r2
+                str needReRender r1
 
         //handle movement inputs
             in r1 %playerinput //forward movement
             smlt446 r1 r1 SPEEDFACTOR //NOTE: this can be removed to save a few cycles and lose speed customizability
-
+            
             in r2 %amogus_sinyaw
             neg r3 r2
             smlt446 r4 r1 r3 //r3 = velX
 
             in r3 %amogus_cosyaw
             smlt446 r5 r1 r3 //r4 = velZ
-
+        
+        
             in r1 %playerinput //strafe movement
             smlt446 r1 r1 SPEEDFACTOR //NOTE: this can be removed to save a few cycles and lose speed customizability
 
@@ -152,6 +213,7 @@ minstack 23
             .jumpInputEnd
         
         //move and collide
+            in r0 %blockram_oobactive //tell the blockRAM to return blocks out of bounds
             //prepare stack
                 psh r1 //velY
                 psh r5 //velZ
@@ -257,7 +319,7 @@ minstack 23
                 .collideNoMovement //if no movement was detected in the main axis, skip to here.
                 llod r7 sp 0
             bne .collisionLoop r7 x //if next loop starts on X axis, don't do another loop. Always loops 2 times.
-            imm sp 30 //reset the stack //NOTE: If the size of the stack before collision detection occurs changes, this value must also change. On CHUNGUS the bottom of the stack is always 255, so this will be 0 on an empty stack. This differs in URCX.
+            imm sp 52 //reset the stack //NOTE: If the size of the stack before collision detection occurs changes, this value must also change. On CHUNGUS the bottom of the stack is always 255, so this will be 0 on an empty stack. This differs in URCX.
 
             //collide with bedrock
                 lod r1 y
@@ -266,10 +328,32 @@ minstack 23
                     str onGround @max
                     str velY 0
         
-        in r0 %playerinput //is drop item pressed?
+        in r0 %playerinput //is delete item pressed?
 
     //do rendering stuff
-        //send camera data to AMOGUS
+        //check if render is necessary
+            lod r1 needReRender
+            bnz .doFullRender r1
+
+            //check if player moved
+                lod r1 prevX
+                lod r2 x
+                str prevX r2
+                bne .doFullRender r1 r2
+
+                lod r1 prevY
+                lod r2 y
+                str prevY r2
+                bne .doFullRender r1 r2
+
+                lod r1 prevZ
+                lod r2 z
+                str prevZ r2
+                bne .doFullRender r1 r2
+            
+            jmp .endFullRender
+
+        .doFullRender
             lod r1 rot
             out %amogus_camrot r1
 
@@ -289,14 +373,17 @@ minstack 23
             add r1 r1 r2 //move to appropriate camera height
             out %amogus_camy r1
         
-        in r0 %meshgen_renderscene
+            in r0 %meshgen_renderscene
 
-        in r0 %amogus_drawtoscreen
-        in r0 %screen_buffer
+            //TODO: render items, chests, furnaces
 
-        in r0 %amogus_clearbuffer
+            in r0 %amogus_drawtoscreen
+            in r0 %screen_buffer
 
-    out %wait 125
+            in r0 %amogus_clearbuffer
+        .endFullRender
+
+    out %wait 250
     in r0 %wait
 jmp .mainLoop
 
@@ -321,55 +408,64 @@ jmp .mainLoop
         //r1 - r7 (not preserved)
         //4 stack positions
 .rayCast
+    in r0 %blockram_oobinactive //tell the blockram not to return blocks out of bounds
+
     //initialize values
     lod r1 x
     add r1 r1 PLAYERHALFWIDTH
-    and r4 r1 0b0000_1111 //r4 = cam x pos in block
+    and r5 r1 0x0f //r5 = cam x pos in block
     bsr r1 r1 4 //r1 = x block pos
 
     lod r2 y
     add r2 r2 PLAYERCAMHEIGHT
-    and r5 r2 0b0000_1111 //r5 = cam y pos in block
+    and r6 r2 0x0f //r6 = cam y pos in block
     bsr r2 r2 4 //r2 = y block pos
 
     lod r3 z
     add r3 r3 PLAYERHALFWIDTH
-    and r6 r1 0b0000_1111 //r6 = cam z pos in block
+    and r7 r3 0x0f //r7 = cam z pos in block
     bsr r3 r3 4 //r3 = z block pos
 
     //TODO: convert the following repeated code segment into a loop?
 
-    in r4 %amogus_camdirx
-    brn ~+3 r4 //if camDirX positive:
-        sub r5 0b0001_0000 r5 //swap X distance to edge of block direction
-        jmp ~+2
-    //if camDirX negative:
-        neg r4 r4
-    sdiv446 r5 r5 r4 //r5 = tMaxX
-    sdiv446 r4 0b0001_0000 r4 //r4 = tDeltaX
-    psh r4
+    //set up initial X t values
+        in r4 %amogus_camdirx
+        brn ~+3 r4 //if camDirX positive:
+            sub r5 BLOCKSIZE r5 //swap X distance to edge of block direction
+            jmp ~+2
+        //if camDirX negative:
+            neg r4 r4
+        sdiv446 r5 r5 r4 //r5 = tMaxX
+        sdiv446 r4 0x10 r4 //r4 = tDeltaX
+        ble ~+2 r4 RAYCASTMAXLENGTH
+            imm r4 RAYCASTMAXLENGTH
+        psh r4
 
+    //set up initial Y t values
+        in r4 %amogus_camdiry
+        brn ~+3 r4 //if camDirY positive:
+            sub r6 BLOCKSIZE r6 //swap X distance to edge of block direction
+            jmp ~+2
+        //if camDirY negative:
+            neg r4 r4
+        sdiv446 r6 r6 r4 //r6 = tMaxY
+        sdiv446 r4 0x10 r4 //r4 = tDeltaY
+        ble ~+2 r4 RAYCASTMAXLENGTH
+            imm r4 RAYCASTMAXLENGTH
+        psh r4
 
-    in r4 %amogus_camdiry
-    brn ~+3 r4 //if camDirY positive:
-        sub r6 0b0001_0000 r6 //swap X distance to edge of block direction
-        jmp ~+2
-    //if camDirY negative:
-        neg r4 r4
-    sdiv446 r6 r6 r4 //r6 = tMaxY
-    sdiv446 r4 0b0001_0000 r4 //r4 = tDeltaY
-    psh r4
-
-    
-    in r4 %amogus_camdirz
-    brn ~+3 r4 //if camDirZ positive:
-        sub r7 0b0001_0000 r7 //swap X distance to edge of block direction
-        jmp ~+2
-    //if camDirZ negative:
-        neg r4 r4
-    sdiv446 r7 r7 r4 //r7 = tMaxZ
-    sdiv446 r4 0b0001_0000 r4 //r4 = tDeltaZ
-    psh r4
+    //set up initial Z t values
+        in r4 %amogus_camdirz
+        brn ~+3 r4 //if camDirZ positive:
+            sub r7 BLOCKSIZE r7 //swap X distance to edge of block direction
+            jmp ~+2
+        //if camDirZ negative:
+            neg r4 r4
+        sdiv446 r7 r7 r4 //r7 = tMaxZ
+        sdiv446 r4 0x10 r4 //r4 = tDeltaZ
+        ble ~+2 r4 RAYCASTMAXLENGTH
+            imm r4 RAYCASTMAXLENGTH
+        psh r4
 
     //stack:
         //sp+2: tDeltaX
@@ -392,22 +488,22 @@ jmp .mainLoop
     or r3 r1 r3 //r3 = combined xz pos
     mov r4 r2 //r4 = y pos
     
-    //TODO: make .rayCastStepX, Y, and Z all use the same code?
+    //TODO: make .rayCastFunctionStepX, Y, and Z all use the same code?
 
-    .rayCastLoop
+    .rayCastFunctionLoop
         //move currentBlock to previousBlock
         mov r1 r3
         mov r2 r4
 
-        brg .rayCastDontStepX r5 r6 //if (tMaxX <= tMaxY) {rayCastDontStepX()}
-            brg .rayCastStepZ r5 r7 //if (tMaxX <= tMaxZ) && (tMaxX <= tMaxY) {rayCastStepX()}
+        brg .rayCastFunctionDontStepX r5 r6 //if (tMaxX <= tMaxY) {rayCastFunctionDontStepX()}
+            brg .rayCastFunctionStepZ r5 r7 //if (tMaxX <= tMaxZ) && (tMaxX <= tMaxY) {rayCastFunctionStepX()}
             
-                .rayCastStepX
+                .rayCastFunctionStepX
 
                     ble ~+4 r5 RAYCASTMAXLENGTH
                         imm r5 0
                         imm r6 -1 //raycast length = -1
-                        ret //if t is longer than max length, end raycast
+                        jmp .rayCastFunctionEnd
 
                     psh r5 //free up r5 to use as a temp register
                         in r5 %amogus_camdirx
@@ -415,26 +511,26 @@ jmp .mainLoop
                             addv r3 r3 0x10 //increment x
                         jmp ~+2 //if camDirX is negative:
                             subv r3 r3 0x10 //decrement x
-                        bsr r3 r3 4
-                        out %blockram_x r3
+                        bsr r5 r3 4
+                        out %blockram_x r5
 
                         //fetch the new block
                             in r5 %blockram_id
                             brz ~+3 r5
                                 pop r6 //raycast Length = tMaxX
-                                ret //if block is not air, end raycast //NOTE: for Redstone, more checks are needed
+                                jmp .rayCastFunctionEnd
                     pop r5
                     llod r1 sp 2 //r1 = tDeltaX
                     add r5 r5 r1 //tMaxX = tMaxX + dDeltaX
 
-                jmp .rayCastLoop
+                jmp .rayCastFunctionLoop
 
-                .rayCastStepZ
+                .rayCastFunctionStepZ
 
                     ble ~+4 r7 RAYCASTMAXLENGTH
                         imm r5 0
                         imm r6 -1 //raycast length = -1
-                        ret //if t is longer than max length, end raycast
+                        jmp .rayCastFunctionEnd
 
                     psh r5 //free up r5 to use as a temp register
                         in r5 %amogus_camdirz
@@ -450,24 +546,24 @@ jmp .mainLoop
                             brz ~+4 r5
                                 pop r0
                                 mov r6 r7 //raycast length = tMaxZ
-                                ret //if block is not air, end raycast //NOTE: for Redstone, more checks are needed
+                                jmp .rayCastFunctionEnd
                     pop r5
                     llod r1 sp 0 //r1 = tDeltaZ
                     add r7 r7 r1 //tMaxX = tMaxZ + dDeltaZ
 
-                jmp .rayCastLoop
+                jmp .rayCastFunctionLoop
 
-            .rayCastDontStepX
-            brg .rayCastStepZ r6 r7
+            .rayCastFunctionDontStepX
+            brg .rayCastFunctionStepZ r6 r7
 
-                .rayCastStepY
+                .rayCastFunctionStepY
                     ble ~+4 r6 RAYCASTMAXLENGTH
                         imm r5 0
                         imm r6 -1 //raycast length = -1
-                        ret //if t is longer than max length, end raycast
+                        jmp .rayCastFunctionEnd
 
                     psh r5 //free up r5 to use as a temp register
-                        in r5 %amogus_camdirz
+                        in r5 %amogus_camdiry
                         brn ~+3 r5 //if camDirY is positive:
                             addv r4 r4 0x01 //increment y
                         jmp ~+2 //if camDirY is negative:
@@ -478,14 +574,18 @@ jmp .mainLoop
                             bne ~+4 r4 0x0f
                                 pop r0
                                 imm r5 -1
-                                ret //if y == -1, return bedrock
+                                jmp .rayCastFunctionEnd
                             in r5 %blockram_id
                             brz ~+3 r5
                                 pop r0
-                                ret //if block is not air, end raycast //NOTE: for Redstone, more checks are needed
+                                jmp .rayCastFunctionEnd
                     pop r5
                     llod r1 sp 0 //r1 = tDeltaZ
                     add r6 r6 r1 //tMaxX = tMaxZ + dDeltaZ
                 
-                jmp .rayCastLoop
-//end rayCast function
+                jmp .rayCastFunctionLoop
+    .rayCastFunctionEnd
+        pop r0
+        pop r0
+        pop r0
+ret
