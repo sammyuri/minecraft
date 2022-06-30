@@ -12,6 +12,7 @@ minstack 23
         @define PLAYERCAMHEIGHT 24
         @define PLAYERCROUCHCAMHEIGHT 22
         @define MIDDLEOFVOID 0b1100_0000
+        @define BLOCKMIDDLEOFVOID 0b1100
     //gameplay constants
         @define GRAVITY 15 //the downwards change in velocity per frame
         @define JUMPSTRENGTH 17 //the initial vertical velocity of a jump
@@ -70,7 +71,7 @@ minstack 23
         @define ITEM_CHEST 0xFF
 
 //memory locations
-//NOTE: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
+//OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
     @define x m0 //replace with 0x00 if 'm0' not supported in translator
     @define y m1
     @define z m2
@@ -137,6 +138,7 @@ minstack 23
                 out %blockram_y r4
                 //TODO: drop item entity
                 out %blockram_id 0 //replace targeted block with air
+                //TODO: check if block above this block is sand, if so, make it fall
                 str needReRender @max
                 jmp .endBreakAndPlace
             .endBreakBlock
@@ -151,7 +153,7 @@ minstack 23
                 and r7 r1 0x0f
                 out %blockram_z r7
                 out %blockram_y r2
-                out %blockram_id BLOCK_GRASS //TODO: replace grass with whatever is currently held
+                out %blockram_id BLOCK_GRASS //TEMP: replace grass with whatever is currently held
             jmp .endBreakAndPlace
             .noRayCastHit
                 in r7 %playerinput //is place pressed?
@@ -249,8 +251,13 @@ minstack 23
                 bne ~+3 r2 r1 //if block position doesn't change, don't check collisions in this axis
                     pop r0
                     jmp .collideNoMovement
+                bne ~+5 r3 y //only clamp position on the Y axis
+                    ble ~+2 r1 BLOCKMIDDLEOFVOID //if min pos is greater than middle of void, it is negative, and should be clamped to 0.
+                        imm r1 0
+                    ble ~+2 r2 BLOCKMIDDLEOFVOID //if max pos is greater than middle of void, it is negative, and should be clamped to 0.
+                        imm r2 0
                 //r1 = min block pos in main axis
-                //r2 = max block pos in main axis //NOTE: having pre-movement position always be max is a bit hacky, but it works for this specific use case with these specific values of max speed in each axis, hitbox size, and gravity. If it ends up being smaller than the min pos, it'll just skip it when it reaches the end of the loop.
+                //r2 = max block pos in main axis //HACK: having pre-movement position always be max is a bit hacky, but it works for this specific use case with these specific values of max speed in each axis, hitbox size, and gravity. If it ends up being smaller than the min pos, it'll just skip it when it reaches the end of the loop.
                 llod r3 sp 1 //r3 = memory location of pos in secondary axis
                 lod r3 r3 //r3 = min pos in secondary axis
                 llod r4 sp 6 //r4 = player size in secondary axis
@@ -287,7 +294,7 @@ minstack 23
                                     bsl r7 r1 4 //r7 = world position of block in main axis
                                     add r7 r7 BLOCKSIZE //r7 = world position of player in main axis
                                     llod r1 sp 3 //r7 = pointer towards player position in main axis
-                                    str r1 r7 //store 
+                                    str r1 r7 //store player position
                                     mov r7 r1
                                     pop r1
                                     bne .collideResolveEnd r7 y //if main axis is y axis and collision detected in negative direction, player is on ground
@@ -388,7 +395,7 @@ minstack 23
 jmp .mainLoop
 
 
-//rayCast function //NOTE: there is still a lot of room for optimization in this section of code. Most of it can probably be reused instead of repeated.
+//rayCast function //NOTE: there is still a lot of room for OPTIMimization in this section of code. Most of it can probably be reused instead of repeated.
     //description:
         //casts a ray from the position and direction of the camera, and returns what it hits
     //inputs:
@@ -426,7 +433,7 @@ jmp .mainLoop
     and r7 r3 0x0f //r7 = cam z pos in block
     bsr r3 r3 4 //r3 = z block pos
 
-    //TODO: convert the following repeated code segment into a loop?
+    //OPTIM: convert the following repeated code segment into a loop?
 
     //set up initial X t values
         in r4 %amogus_camdirx
@@ -488,7 +495,7 @@ jmp .mainLoop
     or r3 r1 r3 //r3 = combined xz pos
     mov r4 r2 //r4 = y pos
     
-    //TODO: make .rayCastFunctionStepX, Y, and Z all use the same code?
+    //OPTIM: make .rayCastFunctionStepX, Y, and Z all use the same code?
 
     .rayCastFunctionLoop
         //move currentBlock to previousBlock
@@ -549,7 +556,7 @@ jmp .mainLoop
                                 jmp .rayCastFunctionEnd
                     pop r5
                     llod r1 sp 0 //r1 = tDeltaZ
-                    add r7 r7 r1 //tMaxX = tMaxZ + dDeltaZ
+                    add r7 r7 r1 //tMaxZ = tMaxZ + dDeltaZ
 
                 jmp .rayCastFunctionLoop
 
@@ -565,23 +572,23 @@ jmp .mainLoop
                     psh r5 //free up r5 to use as a temp register
                         in r5 %amogus_camdiry
                         brn ~+3 r5 //if camDirY is positive:
-                            addv r4 r4 0x01 //increment y
+                            inc r4 r4 //increment y
                         jmp ~+2 //if camDirY is negative:
-                            subv r4 r4 0x01 //decrement y
+                            dec r4 r4 //decrement y
                         out %blockram_y r4
 
                         //fetch the new block
-                            bne ~+4 r4 0x0f
+                            bne ~+4 r4 -1 //check if y is at bedrock
                                 pop r0
-                                imm r5 -1
+                                imm r5 -1 //return bedrock if y = -1
                                 jmp .rayCastFunctionEnd
                             in r5 %blockram_id
                             brz ~+3 r5
                                 pop r0
                                 jmp .rayCastFunctionEnd
                     pop r5
-                    llod r1 sp 0 //r1 = tDeltaZ
-                    add r6 r6 r1 //tMaxX = tMaxZ + dDeltaZ
+                    llod r1 sp 1 //r1 = tDeltaY
+                    add r6 r6 r1 //tMaxY = tMaxY + dDeltaY
                 
                 jmp .rayCastFunctionLoop
     .rayCastFunctionEnd
