@@ -109,6 +109,7 @@ export class Emulator implements Instruction_Ctx, Device_Host {
     reset(){
         this.stack_ptr = this.memory.length;
         this.pc = 0;
+        this.callStackPointer = 0; //CHUNGUS
         this.ins = []; this.outs = [];
         for (const reset of this.device_resets){
             reset();
@@ -120,14 +121,16 @@ export class Emulator implements Instruction_Ctx, Device_Host {
     buffer = new ArrayBuffer(1024*1024);
     registers: WordArray = new Uint8Array(32);
     memory: WordArray = new Uint8Array(256);
+    callStack: WordArray = new Uint32Array(31); //CHUNGUS
+    callStackPointer: number = 0; //CHUNGUS
     pc_counters: number[] = [];
-    pc_full = 0;
+    pc_full = 0; //CHUNGUS
     get pc(){
-        return this.pc_full;
+        return this.pc_full; //CHUNGUS
     }
     set pc(value: Word){
         this.registers[Register.PC] = value;
-        this.pc_full = value;
+        this.pc_full = value; //CHUNGUS
     }
     get stack_ptr(){
         return this.registers[Register.SP];
@@ -183,6 +186,18 @@ export class Emulator implements Instruction_Ctx, Device_Host {
             this.error(`Stack underflow: ${this.stack_ptr} >= ${this.memory.length}`);
         }
         return this.memory[this.stack_ptr++];
+    }
+    callStack_push(value: number): void { //CHUNGUS
+        if (this.callStackPointer >= this.callStack.length) {
+            this.error(`Call stack overflow: ${this.callStackPointer} >= ${this.callStack.length}`);
+        }
+        this.callStack[this.callStackPointer++] = value;
+    }
+    callStack_pop(): number { //CHUNGUS
+        if (this.callStackPointer <= 0) {
+            this.error(`Call stack underflow: ${this.callStackPointer} <= 0`);
+        }
+        return this.callStack[--this.callStackPointer];
     }
     ins: number[] = [];
     outs: number[] = [];

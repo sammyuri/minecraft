@@ -159,6 +159,8 @@ export interface Instruction_Ctx {
     m_get(a: number): number;
     push(a: number): void;
     pop(): number;
+    callStack_push(a: number): void;
+    callStack_pop(): number;
     in(port: number): boolean;
     out(port: number, value: number): void;
 }
@@ -243,9 +245,9 @@ export const Opcodes_operants: Record<Opcode, [Operant_Operation[], Instruction_
     // Pop from the value stack into Op1
     [Opcode.POP ]: [[SET          ], (s) => {s.a = s.pop()}],
     // Pushes the address of the next instruction onto the stack then branches to Op1
-    [Opcode.CAL ]: [[GET          ], (s) => {s.push(s.pc); s.pc = s.a}],
+    [Opcode.CAL ]: [[GET          ], (s) => {s.callStack_push(s.pc); s.pc = s.a}],
     // Pops from the stack, then branches to that value
-    [Opcode.RET ]: [[             ], (s) => {s.pc = s.pop()}],
+    [Opcode.RET ]: [[             ], (s) => {s.pc = s.callStack_pop()}],
     // Stop Execution emediately after opcode is read
     [Opcode.HLT ]: [[             ],() => true],
     // Copies the value located at the RAM location pointed to by Op2 into the RAM position pointed to by Op1.

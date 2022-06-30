@@ -9,32 +9,44 @@ export var Step_Result;
     Step_Result[Step_Result["Debug"] = 3] = "Debug";
 })(Step_Result || (Step_Result = {}));
 export class Emulator {
-    options;
-    signed(v) {
-        return (v & this.sign_bit) === 0 ? v : v | (0xffff_ffff << this.bits);
+    constructor(options) {
+        this.options = options;
+        this.a = 0;
+        this.b = 0;
+        this.c = 0;
+        this._debug_message = undefined;
+        this.heap_size = 0;
+        this.buffer = new ArrayBuffer(1024 * 1024);
+        this.registers = new Uint8Array(32);
+        this.memory = new Uint8Array(256);
+        this.callStack = new Uint32Array(31); //CHUNGUS
+        this.callStackPointer = 0; //CHUNGUS
+        this.pc_counters = [];
+        this.pc_full = 0; //CHUNGUS
+        this.bits = 8;
+        this.device_inputs = {};
+        this.device_outputs = {};
+        this.device_resets = [];
+        this.devices = [];
+        this.ins = [];
+        this.outs = [];
     }
-    a = 0;
-    b = 0;
-    c = 0;
+    signed(v) {
+        return (v & this.sign_bit) === 0 ? v : v | (4294967295 << this.bits);
+    }
     get sa() { return this.signed(this.a); }
     set sa(v) { this.a = v; }
     get sb() { return this.signed(this.b); }
     set sb(v) { this.b = v; }
     get sc() { return this.signed(this.c); }
     set sc(v) { this.c = v; }
-    program;
-    debug_info;
-    _debug_message = undefined;
     get_debug_message() {
         const msg = this._debug_message;
         this._debug_message = undefined;
         return msg;
     }
-    constructor(options) {
-        this.options = options;
-    }
-    heap_size = 0;
     load_program(program, debug_info) {
+        var _a, _b;
         this._debug_message = undefined;
         this.program = program, this.debug_info = debug_info;
         this.pc_counters = Array.from({ length: program.opcodes.length }, () => 0);
@@ -74,7 +86,7 @@ export class Emulator {
         const buffer_size = (memory_size + registers) * WordArray.BYTES_PER_ELEMENT;
         if (this.buffer.byteLength < buffer_size) {
             this.warn(`resizing Arraybuffer to ${buffer_size} bytes`);
-            const max_size = this.options.max_memory?.();
+            const max_size = (_b = (_a = this.options).max_memory) === null || _b === void 0 ? void 0 : _b.call(_a);
             if (max_size && buffer_size > max_size) {
                 throw new Error(`Unable to allocate memory for the emulator because\t\n${buffer_size} bytes exceeds the maximum of ${max_size}bytes`);
             }
@@ -98,6 +110,7 @@ export class Emulator {
     reset() {
         this.stack_ptr = this.memory.length;
         this.pc = 0;
+        this.callStackPointer = 0; //CHUNGUS
         this.ins = [];
         this.outs = [];
         for (const reset of this.device_resets) {
@@ -107,17 +120,12 @@ export class Emulator {
     shrink_buffer() {
         this.buffer = new ArrayBuffer(1024 * 1024);
     }
-    buffer = new ArrayBuffer(1024 * 1024);
-    registers = new Uint8Array(32);
-    memory = new Uint8Array(256);
-    pc_counters = [];
-    pc_full = 0;
     get pc() {
-        return this.pc_full;
+        return this.pc_full; //CHUNGUS
     }
     set pc(value) {
         this.registers[Register.PC] = value;
-        this.pc_full = value;
+        this.pc_full = value; //CHUNGUS
     }
     get stack_ptr() {
         return this.registers[Register.SP];
@@ -125,11 +133,6 @@ export class Emulator {
     set stack_ptr(value) {
         this.registers[Register.SP] = value;
     }
-    bits = 8;
-    device_inputs = {};
-    device_outputs = {};
-    device_resets = [];
-    devices = [];
     add_io_device(device) {
         this.devices.push(device);
         if (device.inputs) {
@@ -149,7 +152,7 @@ export class Emulator {
         }
     }
     get max_value() {
-        return 0xff_ff_ff_ff >>> (32 - this.bits);
+        return 4294967295 >>> (32 - this.bits);
     }
     get max_size() {
         return this.max_value + 1;
@@ -172,8 +175,18 @@ export class Emulator {
         }
         return this.memory[this.stack_ptr++];
     }
-    ins = [];
-    outs = [];
+    callStack_push(value) {
+        if (this.callStackPointer >= this.callStack.length) {
+            this.error(`Call stack overflow: ${this.callStackPointer} >= ${this.callStack.length}`);
+        }
+        this.callStack[this.callStackPointer++] = value;
+    }
+    callStack_pop() {
+        if (this.callStackPointer <= 0) {
+            this.error(`Call stack underflow: ${this.callStackPointer} <= 0`);
+        }
+        return this.callStack[--this.callStackPointer];
+    }
     in(port) {
         try {
             const device = this.device_inputs[port];
@@ -223,7 +236,7 @@ export class Emulator {
                     const char = JSON.stringify(String.fromCodePoint(value));
                     char_str = `'${char.substring(1, char.length - 1)}'`;
                 }
-                catch { }
+                catch (_a) { }
                 this.debug(`Written to port ${port} (${IO_Port[port]}) value=${value} ${char_str}`);
             }
             device(value);
@@ -328,11 +341,12 @@ export class Emulator {
     }
     // this method only needs to be called for the IN instruction
     finish_step_in(port, result) {
+        var _a, _b;
         const pc = this.pc++;
         const type = this.program.operant_prims[pc][0];
         const value = this.program.operant_values[pc][0];
         this.write(type, value, result);
-        this.options.on_continue?.();
+        (_b = (_a = this.options).on_continue) === null || _b === void 0 ? void 0 : _b.call(_a);
     }
     write(target, index, value) {
         switch (target) {
@@ -364,7 +378,7 @@ export class Emulator {
         const { pc_line_nrs, lines, file_name } = this.debug_info;
         const line_nr = pc_line_nrs[this.pc - 1];
         const trace = this.decode_memory(this.stack_ptr, this.memory.length, false);
-        const content = `${file_name ?? "eval"}:${line_nr + 1} - ERROR - ${msg}\n    ${lines[line_nr]}\n\n${indent(registers_to_string(this), 1)}\n\nstack trace:\n${trace}`;
+        const content = `${file_name !== null && file_name !== void 0 ? file_name : "eval"}:${line_nr + 1} - ERROR - ${msg}\n    ${lines[line_nr]}\n\n${indent(registers_to_string(this), 1)}\n\nstack trace:\n${trace}`;
         if (this.options.error) {
             this.options.error(content);
         }
@@ -381,9 +395,10 @@ export class Emulator {
         return `\n\t${line}`;
     }
     format_message(msg, pc = this.pc) {
+        var _a;
         const { lines, file_name } = this.debug_info;
         const line_nr = this.get_line_nr(pc);
-        return `${file_name ?? "eval"}:${line_nr + 1} - ${msg}\n\t${lines[line_nr] ?? ""}`;
+        return `${file_name !== null && file_name !== void 0 ? file_name : "eval"}:${line_nr + 1} - ${msg}\n\t${(_a = lines[line_nr]) !== null && _a !== void 0 ? _a : ""}`;
     }
     warn(msg) {
         const content = this.format_message(`warning - ${msg}`);
@@ -395,9 +410,11 @@ export class Emulator {
         }
     }
     debug(msg) {
-        this._debug_message = (this._debug_message ?? "") + this.format_message(`debug - ${msg}`) + "\n";
+        var _a;
+        this._debug_message = ((_a = this._debug_message) !== null && _a !== void 0 ? _a : "") + this.format_message(`debug - ${msg}`) + "\n";
     }
     decode_memory(start, end, reverse) {
+        var _a, _b, _c;
         const w = 8;
         const headers = ["hexaddr", "hexval", "value", "*value", "linenr", "*opcode"];
         let str = headers.map(v => pad_center(v, w)).join("|");
@@ -410,12 +427,11 @@ export class Emulator {
             const index = hex(j, w, " ");
             const h = hex(v, w, " ");
             const value = pad_left("" + v, w);
-            const opcode = pad_left(Opcode[this.program.opcodes[v]] ?? ".", w);
-            const linenr = pad_left("" + (this.debug_info.pc_line_nrs[v] ?? "."), w);
-            const mem = pad_left("" + (this.memory[v] ?? "."), w);
+            const opcode = pad_left((_a = Opcode[this.program.opcodes[v]]) !== null && _a !== void 0 ? _a : ".", w);
+            const linenr = pad_left("" + ((_b = this.debug_info.pc_line_nrs[v]) !== null && _b !== void 0 ? _b : "."), w);
+            const mem = pad_left("" + ((_c = this.memory[v]) !== null && _c !== void 0 ? _c : "."), w);
             str += `\n${index}|${h}|${value}|${mem}|${linenr}|${opcode}`;
         }
         return str;
     }
 }
-//# sourceMappingURL=emulator.js.map
