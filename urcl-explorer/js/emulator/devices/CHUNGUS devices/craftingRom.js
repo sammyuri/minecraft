@@ -38,7 +38,7 @@ export class CraftingRom {
             ["0D00D00E0"]: Results.ironSword,
             ["00D00D00E"]: Results.ironSword,
             ["D00D00E00"]: Results.ironSword,
-            ["0D0D00000"]: Results.shears, //TODO: add other locations
+            ["0D0D00000"]: Results.shears,
         };
         this.mode = 0;
         this.currentRecipe = "000000000"; //use string because 9 hex values just barely don't fit into 32 bits
@@ -75,7 +75,6 @@ var Mode;
     Mode[Mode["smelting"] = 1] = "smelting";
 })(Mode || (Mode = {}));
 ;
-//TODO: review IDs and ensure up-to-date
 var Ingredients;
 (function (Ingredients) {
     Ingredients[Ingredients["air"] = 0] = "air";
