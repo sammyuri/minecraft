@@ -317,8 +317,8 @@ export class Amogus implements Device {
         let eu = this.FixedPointNumber(br.u, 16, 15, true)
         let ev = this.FixedPointNumber(br.v, 16, 15, true)
 
-        for (let y = bly; y < tly + 1; y++) {
-            if (loop < 2 && y == tly && (tly - bly) > 0) {
+        for (let y = bly; y <= tly; y++) {
+            if (loop != 0 && y >= tly) {
                 continue;
             }
             if (0 <= y && y < SCREEN_HEIGHT) {
