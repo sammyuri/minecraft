@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 29
+minheap 32
 minstack 23
 
 //constants
@@ -18,6 +18,8 @@ minstack 23
         @define JUMPSTRENGTH 17 //the initial vertical velocity of a jump
         @define SPEEDFACTOR 0b01_000000 //scales the speed of the characters movement. A value of 1 results in a speed of 4 while crouching, 8 while walking, and 12 while sprinting. In 0bSX.XXXXXX format
         @define RAYCASTMAXLENGTH 0b0100_0000
+    //other constants
+        @define BOTTOMOFSTACK 55 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -71,22 +73,25 @@ minstack 23
         @define ITEM_CHEST 0xFF
 
 //memory locations
-//OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
-    @define x m0 //replace with 0x00 if 'm0' not supported in translator
-    @define y m1
-    @define z m2
-    @define rot m3
-    @define onGround m4
-    @define velY m5
-    @define needReRender m6
-    @define crouching m7
-    @define prevX m8
-    @define prevY m9
-    @define prevZ m10
-    @define targetedBlockXZ m11
-    @define targetedBlockY m12
-    @define inventory m13 //takes up 15 cells (m13-m27)
-    @define hotbarSlot m28
+    //OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
+    @define x m0 //7 bits //NOTE: replace with '0' if 'm0' not supported in translator
+    @define y m1 //8 bits
+    @define z m2 //7 bits
+    @define rot m3 //8 bits
+    @define onGround m4 //1 bit //OPTIM: some of these variables (esp. bools) could probably be combined into shared bytes
+    @define velY m5 //6 bits
+    @define needReRender m6 //1 bit
+    @define crouching m7 //1 bit
+    @define prevX m8 //7 bits
+    @define prevY m9 //8 bits
+    @define prevZ m10 //7 bits
+    @define prevTargetXZ m11 //8 bits XXXX_ZZZZ
+    @define prevTargetY m12 //4 bits
+    @define inventory m13 //NOTE: takes up 15 cells (m13-m27), 8 bits each
+    @define hotbarSlot m28 //3 bits
+    @define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current
+    @define targetXZ m30 //8 bits XXXX_ZZZZ
+    @define targetY m31 //4 bits
 
 //initial values
     str x 0x10
@@ -100,8 +105,11 @@ minstack 23
     str prevX 0
     str prevY 0
     str prevZ 0
-    str targetedBlockXZ 0xff
-    str targetedBlockY 0xff
+    str prevTargetXZ 0xff
+    str prevTargetY 0x0f
+    str targetXZ 0xff
+    str targetY 0x0f
+    
 
 .mainLoop
     out %playerinput r0 //synchronize playerInput device
@@ -122,25 +130,58 @@ minstack 23
                 //r4: y pos of first found block
                 //r5: id of first found block (returns air if nothing found, bedrock will return -1)
                 //r6: length of raycast (returns -1 if nothing found)
-            in r7 %playerinput //is break pressed?
+            lod r7 targetXZ
+            str prevTargetXZ r7
+            str targetXZ r3
+            sete r6 r3 r7
+            lod r7 targetY
+            str prevTargetY r7
+            str targetY r4
+            sete r7 r4 r7
+            and r6 r6 r7 //r6 = is the target the same as last frame?
+            in r7 %playerinput //r7 = is break pressed?
+            psh r7 //save input
+                and r6 r6 r7 //r7 is the target the same as last frame AND break pressed?
+                lod r7 breakPhase //r7 = breakPhase
+                bnz ~+4 r6 //target has changed:
+                    bsl r6 r7 4 //move current breakphase to old breakphase and set current breakphase to 0.
+                    str breakPhase r6
+                    jmp ~+5
+                //target hasn't changed:
+                    bsl r6 r7 4
+                    and r7 r7 0x0f
+                    or r6 r6 r7 //copy current breakphase into old breakphase without changing current breakphase.
+                    str breakPhase r6
+            pop r7 //r7 = is break pressed?
             lod r6 hotbarSlot
             add r6 inventory r6 //r6 = pointer towards item in hand
             lod r6 r6 //r6 = item in hand
             brz .noRayCastHit r5
             brz .endBreakBlock r7
                 brn .endBreakBlock r5 //if bedrock, can't break block
-                //TODO: use the item in hand
-                //TODO: add animation/block breaking delay
-                bsr r7 r3 4
-                out %blockram_x r7
-                and r7 r3 0x0f
-                out %blockram_z r7
-                out %blockram_y r4
-                //TODO: drop item entity
-                out %blockram_id 0 //replace targeted block with air
-                //TODO: check if block above this block is sand, if so, make it fall
-                str needReRender @max
-                jmp .endBreakAndPlace
+                
+                lod r7 breakPhase
+                //TODO: check what item is in hand to get the appropriate strength
+                addv r7 r7 0x01 //increase block-breaking progress //TEMP: repace the '0x01' here with the strength of the held too against the targeted block
+                and r6 r7 0x0f //r6 = current breakphase
+                bge .finishBreakingBlock r6 8
+                    str breakPhase r7
+                    in r0 %playerinput //keep playerInput device synced
+                    jmp .endBreakAndPlace
+                .finishBreakingBlock
+                    and r7 r7 0xf0
+                    str breakPhase r7
+                    bsr r7 r3 4
+                    out %blockram_x r7
+                    and r7 r3 0x0f
+                    out %blockram_z r7
+                    out %blockram_y r4
+                    //TODO: drop item entity if the held tool is appropriate
+                    out %blockram_id 0 //replace targeted block with air
+                    //TODO: check if block above this block is sand, if so, make it fall
+                    str needReRender @max
+                    in r0 %playerinput //keep playerInput device synced
+                    jmp .endBreakAndPlace
             .endBreakBlock
             in r7 %playerinput //is place pressed?
             brz .endBreakAndPlace r7
@@ -156,6 +197,8 @@ minstack 23
                 out %blockram_id BLOCK_GRASS //TEMP: replace grass with whatever is currently held
             jmp .endBreakAndPlace
             .noRayCastHit
+                str targetXZ 0xff
+                str targetY 0x0f
                 in r7 %playerinput //is place pressed?
                 //TODO: check if item in hand is usable without a target, if not, skip to .endBreakAndPlace
             .useNonPlaceable
@@ -291,11 +334,11 @@ minstack 23
                                 brp .collideResolveNegative r7
                                 .collideResolvePositive //if velocity is (-), resolve collision in (+) direction
                                     psh r1 //NOTE: must increase stack indices by 1 because another item has been added to stack
-                                    bsl r7 r1 4 //r7 = world position of block in main axis
-                                    add r7 r7 BLOCKSIZE //r7 = world position of player in main axis
-                                    llod r1 sp 3 //r7 = pointer towards player position in main axis
-                                    str r1 r7 //store player position
-                                    mov r7 r1
+                                        bsl r7 r1 4 //r7 = world position of block in main axis
+                                        add r7 r7 BLOCKSIZE //r7 = world position of player in main axis
+                                        llod r1 sp 3 //r7 = pointer towards player position in main axis
+                                        str r1 r7 //store player position
+                                        mov r7 r1
                                     pop r1
                                     bne .collideResolveEnd r7 y //if main axis is y axis and collision detected in negative direction, player is on ground
                                         str onGround @max
@@ -303,13 +346,13 @@ minstack 23
                                         jmp .collideResolveEnd
                                 .collideResolveNegative //if velocity is (+), resolve collision in (-) direction
                                     psh r1 //NOTE: must increase stack indices by 1 because another item has been added to stack
-                                    bsl r1 r1 4 //r7 = world position of block in main axis
-                                    llod r7 sp 8 //r7 = player size in main axis
-                                    inc r7 r7 //r7 = full player size in main axis
-                                    sub r7 r1 r7 //r7 = player pos in main axis
-                                    llod r1 sp 3 //r1 = RAM pos of main axis position
-                                    str r1 r7 //store player position
-                                    mov r7 r1
+                                        bsl r1 r1 4 //r7 = world position of block in main axis
+                                        llod r7 sp 8 //r7 = player size in main axis
+                                        inc r7 r7 //r7 = full player size in main axis
+                                        sub r7 r1 r7 //r7 = player pos in main axis
+                                        llod r1 sp 3 //r1 = RAM pos of main axis position
+                                        str r1 r7 //store player position
+                                        mov r7 r1
                                     pop r1
                                     bne .collideResolveEnd r7 y //if main axis is y axis and collision detected cancel vertical velocity
                                         str velY 0
@@ -326,7 +369,7 @@ minstack 23
                 .collideNoMovement //if no movement was detected in the main axis, skip to here.
                 llod r7 sp 0
             bne .collisionLoop r7 x //if next loop starts on X axis, don't do another loop. Always loops 2 times.
-            imm sp 52 //reset the stack //NOTE: If the size of the stack before collision detection occurs changes, this value must also change. On CHUNGUS the bottom of the stack is always 255, so this will be 0 on an empty stack. This differs in URCX.
+            imm sp BOTTOMOFSTACK //reset the stack //NOTE: If the size of the stack before collision detection occurs changes, this value must also change.
 
             //collide with bedrock
                 lod r1 y
@@ -338,7 +381,7 @@ minstack 23
         in r0 %playerinput //is delete item pressed?
 
     //do rendering stuff
-        //check if render is necessary
+        //check if full render is necessary
             lod r1 needReRender
             bnz .doFullRender r1
 
@@ -358,9 +401,36 @@ minstack 23
                 str prevZ r2
                 bne .doFullRender r1 r2
             
-            jmp .endFullRender
+        //if full render not necessary, do partial render (render overlay on targeted block):
+            //clear old overlay:
+                lod r1 prevTargetXZ
+                brn .drawCurrentOverlay r1 //if highest bit is active, block is out of bounds.
+                out %meshgen_blockxz r1
+                lod r1 prevTargetY
+                out %meshgen_blocky r1
+                lod r1 breakPhase
+                bsr r1 r1 4
+                out %meshgen_breakphase r1
+                in r0 %meshgen_renderoverlay
+            .drawCurrentOverlay
+                lod r1 targetXZ
+                brn .endPartialRender r1 //if highest bit is active, block is out of bounds.
+                out %meshgen_blockxz r1
+                lod r1 targetY
+                out %meshgen_blocky r1
+                lod r1 breakPhase
+                and r1 r1 0x0f
+                out %meshgen_breakphase r1
+                in r0 %meshgen_renderoverlay
+            .endPartialRender
+            in r0 %amogus_drawtoscreen
+            in r0 %screen_buffer
+            imm r1 50 //TEMP: this simulates a faster frame when you don't need to simulate the entire sccene.
+        jmp .renderUI
 
         .doFullRender
+            in r0 %amogus_clearbuffer
+
             lod r1 rot
             out %amogus_camrot r1
 
@@ -382,16 +452,31 @@ minstack 23
         
             in r0 %meshgen_renderscene
 
-            //TODO: render items, chests, furnaces
+            //TODO: render chests and furnace faces
+
+            lod r1 targetXZ
+            out %meshgen_blockxz r1
+            lod r1 targetY
+            out %meshgen_blocky r1
+            lod r1 breakPhase
+            and r1 r1 0x0f
+            out %meshgen_breakphase r1
+            in r0 %meshgen_renderoverlay
+
+            //TODO: render item entities
 
             in r0 %amogus_drawtoscreen
             in r0 %screen_buffer
+            imm r1 @max //TEMP: this simulates the lag from drawing the entire screen in-game
+        .renderUI
+            //TODO: render UI
 
-            in r0 %amogus_clearbuffer
-        .endFullRender
 
-    out %wait 250
-    in r0 %wait
+
+    //do end of frame cleanup + wait for next frame
+        str needReRender 0
+        out %wait r1 //TEMP: r1 is set based on what type of frame was draw. Full-render frames are much slower.
+        in r0 %wait
 jmp .mainLoop
 
 
