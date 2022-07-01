@@ -21,12 +21,12 @@ export class MeshGen {
             texSettings: 0b0000
         };
         this.outputs = {
-            [IO_Port.MESHGEN_BLOCKXY]: (i) => {
+            [IO_Port.MESHGEN_BLOCKXZ]: (i) => {
                 this.block.x = i >> 4;
-                this.block.y = i & 0xF;
+                this.block.z = i & 0xF;
             },
-            [IO_Port.MESHGEN_BLOCKZ]: (i) => {
-                this.block.z = i >> 4;
+            [IO_Port.MESHGEN_BLOCKY]: (i) => {
+                this.block.y = i;
             },
             [IO_Port.MESHGEN_BREAKPHASE]: (i) => {
                 this.block.breakPhase = i;
@@ -105,7 +105,7 @@ export class MeshGen {
         this.RenderQuad(x, y, z, quadId, texId, 0b1000);
     }
     RenderOverlay(x, y, z, breakPhase) {
-        let texId = 0x1A + breakPhase;
+        let texId = Texture.break0 + breakPhase;
         const Faces = [
             [-1, 0, 0],
             [1, 0, 0],
@@ -124,7 +124,7 @@ export class MeshGen {
         ];
         for (let i = 0; i < 6; i++) {
             let adj = this.blockRAM.getBlock(x + Faces[i][0], y + Faces[i][1], z + Faces[i][2]);
-            if (!this.isTransparent(adj)) {
+            if (this.isTransparent(adj)) {
                 this.RenderQuad(x, y, z, BlockQuads[i], texId, 0b1101);
             }
         }

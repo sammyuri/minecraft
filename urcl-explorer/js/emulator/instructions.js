@@ -237,8 +237,8 @@ export var IO_Port;
     IO_Port[IO_Port["BLOCKRAM_ZI"] = 68] = "BLOCKRAM_ZI";
     IO_Port[IO_Port["BLOCKRAM_ID"] = 69] = "BLOCKRAM_ID";
     //blockToMesh
-    IO_Port[IO_Port["MESHGEN_BLOCKXY"] = 70] = "MESHGEN_BLOCKXY";
-    IO_Port[IO_Port["MESHGEN_BLOCKZ"] = 71] = "MESHGEN_BLOCKZ";
+    IO_Port[IO_Port["MESHGEN_BLOCKXZ"] = 70] = "MESHGEN_BLOCKXZ";
+    IO_Port[IO_Port["MESHGEN_BLOCKY"] = 71] = "MESHGEN_BLOCKY";
     IO_Port[IO_Port["MESHGEN_BREAKPHASE"] = 72] = "MESHGEN_BREAKPHASE";
     IO_Port[IO_Port["MESHGEN_ITEMXZ"] = 73] = "MESHGEN_ITEMXZ";
     IO_Port[IO_Port["MESHGEN_ITEMY"] = 74] = "MESHGEN_ITEMY";
