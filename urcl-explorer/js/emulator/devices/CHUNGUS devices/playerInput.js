@@ -15,7 +15,13 @@ export class PlayerInput {
             move_right: false,
             jump: false,
             crouch: false,
-            sprint: false
+            sprint: false,
+            inventory_up: false,
+            inventory_down: false,
+            inventory_left: false,
+            inventory_right: false,
+            inventory_open: false,
+            inventory_delete: false,
         };
         this.queue = [];
         this.outputs = {
@@ -27,11 +33,24 @@ export class PlayerInput {
             [IO_Port.PLAYERINPUT]: () => {
                 if (this.queue.length == 0) {
                     let output = 0;
-                    this.queue.push(0); //TODO: open/close inventory pressed
-                    this.queue.push(0); //TODO: inventory movement
-                    this.queue.push(this.keys.break ? 1 : 0);
-                    this.queue.push(this.keys.use ? 1 : 0);
-                    this.queue.push(this.keys.crouch ? 1 : 0);
+                    this.queue.push(this.keys.inventory_open ? 1 : 0); //open/close inventory pressed?
+                    output = 0;
+                    if (this.keys.inventory_up) {
+                        output = 1 << 4;
+                    }
+                    else if (this.keys.inventory_down) {
+                        output = (-1 & 0x0F) << 4;
+                    }
+                    if (this.keys.inventory_right) {
+                        output |= 1;
+                    }
+                    else if (this.keys.inventory_left) {
+                        output |= (-1 & 0x0F);
+                    }
+                    this.queue.push(output); //inventory movement
+                    this.queue.push(this.keys.break ? 1 : 0); //break pressed?
+                    this.queue.push(this.keys.use ? 1 : 0); //use/place pressed?
+                    this.queue.push(this.keys.crouch ? 1 : 0); //crouch pressed?
                     output = 0;
                     if (this.keys.look_up) {
                         output = 1 << 4;
@@ -39,21 +58,15 @@ export class PlayerInput {
                     else if (this.keys.look_down) {
                         output = (-1 & 0x0F) << 4;
                     }
-                    else {
-                        output = 0 << 4;
-                    }
                     if (this.keys.look_left) {
                         output |= 1;
                     }
                     else if (this.keys.look_right) {
-                        output |= (-1 && 0x0F);
+                        output |= (-1 & 0x0F);
                     }
-                    else {
-                        output |= 0;
-                    }
-                    this.queue.push(output);
+                    this.queue.push(output); //rotation
                     let speed = this.keys.crouch ? 4 : 8;
-                    if (this.keys.move_forward) {
+                    if (this.keys.move_forward) { //forward movement
                         this.queue.push(speed + (this.keys.sprint && !this.keys.crouch ? 4 : 0));
                     }
                     else if (this.keys.move_backward) {
@@ -62,7 +75,7 @@ export class PlayerInput {
                     else {
                         this.queue.push(0);
                     }
-                    if (this.keys.move_left) {
+                    if (this.keys.move_left) { //strafe movement
                         this.queue.push(-speed & 0xFF);
                     }
                     else if (this.keys.move_right) {
@@ -71,8 +84,8 @@ export class PlayerInput {
                     else {
                         this.queue.push(0);
                     }
-                    this.queue.push(this.keys.jump ? 1 : 0);
-                    this.queue.push(0); //TODO: drop item pressed
+                    this.queue.push(this.keys.jump ? 1 : 0); //jump pressed?
+                    this.queue.push(this.keys.inventory_delete ? 1 : 0); //delete item pressed?
                     return 0;
                 }
                 else {
@@ -124,6 +137,24 @@ export class PlayerInput {
                 case "m":
                     this.keys.use = true;
                     break;
+                case "ArrowDown":
+                    this.keys.inventory_down = true;
+                    break;
+                case "ArrowUp":
+                    this.keys.inventory_up = true;
+                    break;
+                case "ArrowLeft":
+                    this.keys.inventory_left = true;
+                    break;
+                case "ArrowRight":
+                    this.keys.inventory_right = true;
+                    break;
+                case "e":
+                    this.keys.inventory_open = true;
+                    break;
+                case "q":
+                    this.keys.inventory_delete = true;
+                    break;
             }
         });
         addEventListener("keyup", (e) => {
@@ -169,6 +200,24 @@ export class PlayerInput {
                     break;
                 case "m":
                     this.keys.use = false;
+                    break;
+                case "ArrowDown":
+                    this.keys.inventory_down = false;
+                    break;
+                case "ArrowUp":
+                    this.keys.inventory_up = false;
+                    break;
+                case "ArrowLeft":
+                    this.keys.inventory_left = false;
+                    break;
+                case "ArrowRight":
+                    this.keys.inventory_right = false;
+                    break;
+                case "e":
+                    this.keys.inventory_open = false;
+                    break;
+                case "q":
+                    this.keys.inventory_delete = false;
                     break;
             }
         });
