@@ -124,7 +124,9 @@ export class Screen {
         let texture = Textures[this.texId];
         for (let y = 0; y < 8; y++) {
             for (let x = 0; x < 8; x++) {
-                this.buffer[y + this.y1][x + this.x1] = texture[y * 8 + x] ^ color;
+                if (texture[y * 8 + x] == 1) {
+                    this.buffer[y + this.y1][x + this.x1] = color;
+                }
             }
         }
     }
