@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 32
+minheap 43
 minstack 23
 
 //constants
@@ -19,7 +19,7 @@ minstack 23
         @define SPEEDFACTOR 0b01_000000 //scales the speed of the characters movement. A value of 1 results in a speed of 4 while crouching, 8 while walking, and 12 while sprinting. In 0bSX.XXXXXX format
         @define RAYCASTMAXLENGTH 0b0100_0000
     //other constants
-        @define BOTTOMOFSTACK 55 //in URCX: minreg + minheap. in CHUNGUS: 0
+        @define BOTTOMOFSTACK 66 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -71,6 +71,17 @@ minstack 23
         @define ITEM_TABLE 0xFD
         @define ITEM_FURNACE 0xFE
         @define ITEM_CHEST 0xFF
+    //textures
+        @define NUMBER 0x20
+        @define STACKABLE_TEXTURE 0x40
+        @define NONSTACKABLE_TEXTURE 0x50
+        @define GUI_EMPTY 0x61
+        @define GUI_ARROW 0x63
+        @define GUI_SMELTING 0x65
+        @define TEXTURE_INVENTORY 0x70
+        @define TEXTURE_CRAFT 0x75
+        @define TEXTURE_FURNACE 0x78
+        @define TEXTURE_CHEST 0x7C
 
 //memory locations
     //OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
@@ -88,10 +99,13 @@ minstack 23
     @define prevTargetXZ m11 //8 bits XXXX_ZZZZ
     @define prevTargetY m12 //4 bits
     @define inventory m13 //NOTE: takes up 15 cells (m13-m27), 8 bits each
-    @define hotbarSlot m28 //3 bits
+    @define inventorySlot m28 //8 bits
     @define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current
     @define targetXZ m30 //8 bits XXXX_ZZZZ
     @define targetY m31 //4 bits
+    @define craftingGrid m32 //NOTE: takes up 9 cells (m32-m40), 8 bits each
+    @define craftingOutput m41 //8 bits
+    @define permanentSelectedSlot m42 //8 bits
 
 //initial values
     str x 0x10
@@ -109,7 +123,12 @@ minstack 23
     str prevTargetY 0x0f
     str targetXZ 0xff
     str targetY 0x0f
+    str permanentSelectedSlot 0xFF  // outside the inventory
     
+
+str m13 0x14
+str m14 0x55
+
 
 .mainLoop
     out %playerinput r0 //synchronize playerInput device
@@ -119,8 +138,20 @@ minstack 23
         in r0 %playerinput //get input
 
         //handle miscellaneous inputs
-            in r0 %playerinput //is open/close inventory pressed?
-            in r0 %playerinput //inventory movement
+            in r1 %playerinput //is open/close inventory pressed?
+            bnz .bank2_loadInventoryGUI r1  //open inventory
+            
+        .continueFromClosingInventory  // if inventory closed, continue from here
+
+            in r1 %playerinput //inventory movement
+            lod r2 inventorySlot
+            addv r2 r2 r1
+            bne ~+2 r2 5  // rollover to left side of hotbar
+                imm r2 0
+            bne ~+2 r2 15  // rollover to right side of hotbar
+                imm r2 4
+            and r2 r2 0x0F  //keep within hotbar
+            str inventorySlot r2
         
         //handle break/place
             cal .rayCast
@@ -153,7 +184,7 @@ minstack 23
                     or r6 r6 r7 //copy current breakphase into old breakphase without changing current breakphase.
                     str breakPhase r6
             pop r7 //r7 = is break pressed?
-            lod r6 hotbarSlot
+            lod r6 inventorySlot
             add r6 inventory r6 //r6 = pointer towards item in hand
             lod r6 r6 //r6 = item in hand
             brz .noRayCastHit r5
@@ -424,7 +455,6 @@ minstack 23
                 in r0 %meshgen_renderoverlay
             .endPartialRender
             in r0 %amogus_drawtoscreen
-            in r0 %screen_buffer
             imm r1 50 //TEMP: this simulates a faster frame when you don't need to simulate the entire sccene.
         jmp .renderUI
 
@@ -466,17 +496,32 @@ minstack 23
             //TODO: render item entities
 
             in r0 %amogus_drawtoscreen
-            in r0 %screen_buffer
             imm r1 @max //TEMP: this simulates the lag from drawing the entire screen in-game
         .renderUI
-            //TODO: render UI
-
-
+            out %wait r1 //TEMP: r1 is set based on what type of frame was draw. Full-render frames are much slower.
+            in r0 %wait
+            // draw hotbar
+                // draw highlight (black rectangle around hotbar)
+                out %screen_x1 19  // top left x
+                out %screen_y1 51  // top left y
+                out %screen_x2 76  // bottom right x
+                out %screen_y2_clearrect 63  // bottom right y
+                // draw borders
+                out %screen_x1 20  // top left x
+                out %screen_y1 52  // top left y
+                out %screen_x2 75  // bottom right x
+                out %screen_y2_drawrect 63  // bottom right y
+                // draw items
+                imm r1 21  // top left x
+                imm r2 53  // top left y
+                imm r5 5  // length of hotbar
+                imm r6 inventory  // load memory address of hotbar items
+                lod r7 inventorySlot  // get selected item
+                cal .drawGUIRow
 
     //do end of frame cleanup + wait for next frame
+        in r0 %screen_buffer
         str needReRender 0
-        out %wait r1 //TEMP: r1 is set based on what type of frame was draw. Full-render frames are much slower.
-        in r0 %wait
 jmp .mainLoop
 
 
@@ -681,3 +726,1172 @@ jmp .mainLoop
         pop r0
         pop r0
 ret
+
+
+
+//drawItem function
+    //description:
+        // draws an item at given x,y
+        // where x,y is the top left corner of area (1 top/left of the item itself)
+    //inputs:
+        // r1: x (preserved)
+        // r2: y (preserved)
+        // r3: item
+        // r4: is item selected? (0 = selected, anything else = not selected)
+    //outputs:
+        // none
+    //storage used:
+        // none
+.drawItem
+    // draw first rectangle
+    out %screen_x1 r1
+    out %screen_y1 r2
+    add r1 r1 9  // x2
+    add r2 r2 9  // y2
+    out %screen_x2 r1
+    out %screen_y2 r2
+    sub r1 r1 8  // adjust x, y to correct position to draw item itself
+    sub r2 r2 8
+    // check if rectangle needs to be filled or emptied
+    bnz .drawItemNotSelected r4
+
+        // draw selected outline
+        in r0 %screen_drawrect
+        out %screen_x1 r1  // load inner rectangle coordinates
+        out %screen_y1 r2
+        add r1 r1 7  // x2
+        add r2 r2 7  // y2
+        out %screen_x2 r1
+        out %screen_y2 r2
+        sub r1 r1 7  // adjust x, y back to correct position
+        sub r2 r2 7
+
+    .drawItemNotSelected
+    in r0 %screen_clearrect  // clear inner rectangle
+    bnz .drawItemNonZero r3  // check if item exists (ie. not 00000000)
+
+        .drawItemReturn
+        sub r1 r1 1  // preserve x,y
+        sub r2 r2 1
+        in r0 %screen_nop  // ensure screen queue cleared
+        ret
+
+    .drawItemNonZero
+    out %screen_x1 r1  // load correct x1, y1
+    out %screen_y1 r2
+    bge .drawItemNonstackable r3 0xF0 // check if item is nonstackable
+        // draw stackable item
+        bsr r4 r3 4  // get item id
+        add r4 r4 STACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r4
+
+        // draw item count
+        and r3 r3 0x0F  // get item count
+        add r3 r3 NUMBER  // get background texture
+        add r1 r1 2  // move x,y over to correct position
+        add r2 r2 2
+        out %screen_x1 r1  // draw background texture
+        out %screen_y1 r2
+        out %screen_texid_drawtex r3
+        add r3 r3 0x10  // get number texture
+        out %screen_texid_drawinvtex r3
+
+        // return
+        sub r1 r1 3  // preserve x,y
+        sub r2 r2 3
+        in r0 %screen_nop  // ensure screen queue cleared
+        ret
+
+    .drawItemNonstackable
+        // draw nonstackable item
+        and r3 r3 0x0F  // get item id
+        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r3
+        jmp .drawItemReturn  // return
+// end drawItem function
+
+
+//drawGUIRow function
+    //description:
+        // draws a row of items of length r5 starting at x,y
+        // pointed to by r6 in memory with r7 selected
+    //inputs:
+        // r1: x
+        // r2: y
+        // r5: length
+        // r6: memory address of first item
+        // r7: item in row selected (>length = none selected)
+    //outputs:
+        // none
+    //storage used:
+        // none
+.drawGUIRow
+    sub r7 r5 r7  // get loop index of selected item
+    .drawGUIRowLoop
+        lod r3 r6  // get item
+        sub r4 r5 r7  // check if selected (r7 == r5)
+        cal .drawItem  // draw item
+        add r1 r1 11  // increase x by slot size
+        add r6 r6 1  // increase memory index
+        sub r5 r5 1  // decrease loop counter
+        bnz .drawGUIRowLoop r5 // loop if not done yet
+    ret  // return
+// end drawGUIRow function
+
+
+
+
+
+
+
+
+
+// get slot x,y and memory address from id
+.bank2_multiplyXAndYBy11
+    add r7 r7 r5  // adjust memory address by x
+    mlt r5 r5 11  // multiply
+    mlt r6 r6 11
+ret
+.bank2_inventoryGetSlot
+    // r5: x (returned)
+    // r6: y (returned)
+    // r7: slot, address (returned)
+    // NOTE: for chests and furnaces (tile entitites), return address is relative within them
+    bsr r6 r7 4  // split x and y
+    and r5 r7 0x0F  // x
+
+    bge ~+6 r7 0x10  // on hotbar
+        imm r7 inventory  // memory address
+        cal .bank2_multiplyXAndYBy11
+        imm r6 53  // y
+        add r5 r5 21  // x
+        ret
+    bge ~+7 r7 0x30  // within main inventory
+        mlt r7 r6 5  // memory address
+        add r7 r7 inventory
+        cal .bank2_multiplyXAndYBy11
+        sub r6 52 r6  // y
+        add r5 r5 21  // x
+        ret
+    bge ~+7 r7 0x50  // within chest
+        sub r6 r6 3
+        mlt r7 r6 5  // memory address
+        cal .bank2_multiplyXAndYBy11
+        sub r6 18 r6  // y
+        add r5 r5 21  // x
+        ret
+    bge ~+11 r7 0x70  // within small crafting grid
+        sub r6 6 r6
+        mlt r7 r6 3  // memory address
+        sub r6 1 r6
+        add r7 r7 craftingGrid
+        add r7 r7 r5  // adjust memory address by x
+        mlt r5 r5 9  // multiply
+        mlt r6 r6 9
+        sub r6 18 r6  // y
+        add r5 r5 26  // x
+        ret
+    bge ~+11 r7 0xA0  // within large crafting grid
+        sub r6 9 r6
+        mlt r7 r6 3  // memory address
+        sub r6 2 r6
+        add r7 r7 craftingGrid
+        add r7 r7 r5  // adjust memory address by x
+        mlt r5 r5 9  // multiply
+        mlt r6 r6 9
+        sub r6 19 r6  // y
+        add r5 r5 21  // x
+        ret
+    // TODO: furnace
+
+    imm r6 0xFF  // out of bounds
+ret
+
+//bank2_drawItem function
+    //description:
+        // draws an item at given x,y
+        // where x,y is the top left corner of area (1 top/left of the item itself)
+    //inputs:
+        // r1: x (preserved)
+        // r2: y (preserved)
+        // r3: item
+        // r4: is item selected? (0 = selected, anything else = not selected)
+    //outputs:
+        // none
+    //storage used:
+        // none
+.bank2_drawItem
+    // draw first rectangle
+    out %screen_x1 r1
+    out %screen_y1 r2
+    add r1 r1 9  // x2
+    add r2 r2 9  // y2
+    out %screen_x2 r1
+    out %screen_y2 r2
+    sub r1 r1 8  // adjust x, y to correct position to draw item itself
+    sub r2 r2 8
+    // check if rectangle needs to be filled or emptied
+    bnz .bank2_drawItemNotSelected r4
+
+        // draw selected outline
+        in r0 %screen_drawrect
+        out %screen_x1 r1  // load inner rectangle coordinates
+        out %screen_y1 r2
+        add r1 r1 7  // x2
+        add r2 r2 7  // y2
+        out %screen_x2 r1
+        out %screen_y2 r2
+        sub r1 r1 7  // adjust x, y back to correct position
+        sub r2 r2 7
+
+    .bank2_drawItemNotSelected
+    in r0 %screen_clearrect  // clear inner rectangle
+    bnz .bank2_drawItemNonZero r3  // check if item exists (ie. not 00000000)
+
+        .bank2_drawItemReturn
+        sub r1 r1 1  // preserve x,y
+        sub r2 r2 1
+        in r0 %screen_nop  // ensure screen queue cleared
+        ret
+
+    .bank2_drawItemNonZero
+    out %screen_x1 r1  // load correct x1, y1
+    out %screen_y1 r2
+    bge .bank2_drawItemNonstackable r3 0xF0 // check if item is nonstackable
+        // draw stackable item
+        bsr r4 r3 4  // get item id
+        add r4 r4 STACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r4
+
+        // draw item count
+        and r3 r3 0x0F  // get item count
+        add r3 r3 NUMBER  // get background texture
+        add r1 r1 2  // move x,y over to correct position
+        add r2 r2 2
+        out %screen_x1 r1  // draw background texture
+        out %screen_y1 r2
+        out %screen_texid_drawtex r3
+        add r3 r3 0x10  // get number texture
+        out %screen_texid_drawinvtex r3
+
+        // return
+        sub r1 r1 3  // preserve x,y
+        sub r2 r2 3
+        in r0 %screen_nop  // ensure screen queue cleared
+        ret
+
+    .bank2_drawItemNonstackable
+        // draw nonstackable item
+        and r3 r3 0x0F  // get item id
+        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r3
+        jmp .bank2_drawItemReturn  // return
+// end bank2_drawItem function
+
+
+//bank2_drawGUIRow function
+    //description:
+        // draws a row of items of length r5 starting at x,y
+        // pointed to by r6 in memory with r7 selected
+    //inputs:
+        // r1: x
+        // r2: y
+        // r5: length
+        // r6: memory address of first item
+        // r7: item in row selected (>length = none selected)
+    //outputs:
+        // none
+    //storage used:
+        // none
+.bank2_drawGUIRow
+    sub r7 r5 r7  // get loop index of selected item
+    .bank2_drawGUIRowLoop
+        lod r3 r6  // get item
+        sub r4 r5 r7  // check if selected (r7 == r5)
+        cal .bank2_drawItem  // draw item
+        add r1 r1 11  // increase x by slot size
+        add r6 r6 1  // increase memory index
+        sub r5 r5 1  // decrease loop counter
+        bnz .bank2_drawGUIRowLoop r5 // loop if not done yet
+    ret  // return
+// end bank2_drawGUIRow function
+
+
+.bank2_highlightRectangle1
+    out %screen_x1 r1
+    out %screen_y1 r2
+    out %screen_y2 r2
+    add r1 r1 9
+    out %screen_x2 r1
+ret
+
+.bank2_highlightRectangle2
+    out %screen_x1 r1
+    add r2 r2 9
+    out %screen_y2 r2
+ret
+
+.bank2_highlightRectangle3
+    out %screen_y1 r2
+    sub r1 r1 9
+    out %screen_x1 r1
+ret
+
+.bank2_highlightRectangle4
+    out %screen_x2 r1
+    sub r2 r2 9
+    out %screen_y1 r2
+ret
+
+//bank2_drawHighlight function
+    //description:
+        // draws a highlight around the item at x,y
+    //inputs:
+        // r1: x (preserved)
+        // r2: y (preserved)
+.bank2_drawHighlight
+    cal .bank2_highlightRectangle1
+    in r0 %screen_drawrect
+    cal .bank2_highlightRectangle2
+    in r0 %screen_drawrect
+    cal .bank2_highlightRectangle3
+    in r0 %screen_drawrect
+    cal .bank2_highlightRectangle4
+    in r0 %screen_drawrect
+ret
+
+
+//bank2_clearHighlight function
+    //description:
+        // clears the highlight around the item at x,y
+    //inputs:
+        // r1: x (preserved)
+        // r2: y (preserved)
+.bank2_clearHighlight
+    cal .bank2_highlightRectangle1
+    in r0 %screen_clearrect
+    cal .bank2_highlightRectangle2
+    in r0 %screen_clearrect
+    cal .bank2_highlightRectangle3
+    in r0 %screen_clearrect
+    cal .bank2_highlightRectangle4
+    in r0 %screen_clearrect
+ret
+
+
+//bank2_drawItemInGrid function
+    //description:
+        // draws an item at given x,y within a GUI grid
+        // where x,y is the top left corner of area (1 top/left of the item itself)
+    //inputs:
+        // r1: x (preserved)
+        // r2: y (preserved)
+        // r3: item
+    //outputs:
+        // none
+    //storage used:
+        // none
+.bank2_drawItemInGrid
+    // clear rectangle
+    add r1 r1 1  // x1
+    add r2 r2 1  // y1
+    out %screen_x1 r1
+    out %screen_y1 r2
+    add r1 r1 7  // x2
+    add r2 r2 7  // y2
+    out %screen_x2 r1
+    out %screen_y2 r2
+    sub r1 r1 7  // adjust x, y to correct position to draw item itself
+    sub r2 r2 7
+    in r0 %screen_clearrect
+
+    out %screen_x1 r1  // load correct x1, y1
+    out %screen_y1 r2
+    bnz .bank2_drawItemInGridNonZero r3  // check if item exists (ie. not 00000000)
+
+        out %screen_texid_drawtex GUI_EMPTY  // draw empty item
+        .bank2_drawItemInGridReturn
+        sub r1 r1 1  // preserve x,y
+        sub r2 r2 1
+        ret
+
+    .bank2_drawItemInGridNonZero
+    bge .bank2_drawItemInGridNonstackable r3 0xF0 // check if item is nonstackable
+        // draw stackable item
+        bsr r3 r3 4  // get item id
+        add r3 r3 STACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r3
+        // no need to draw item count as at most 1 in grid
+        jmp .bank2_drawItemInGridReturn  // return
+
+    .bank2_drawItemInGridNonstackable
+        // draw nonstackable item
+        and r3 r3 0x0F  // get item id
+        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        out %screen_texid_drawtex r3
+        jmp .bank2_drawItemInGridReturn  // return
+// end bank2_drawItemInGrid function
+
+
+//bank2_drawGUIRowInGrid function
+    //description:
+        // draws a row of items of length r5 starting at x,y
+        // pointed to by r6 in memory with r7 selected
+    //inputs:
+        // r1: x
+        // r2: y
+        // r5: length
+        // r6: memory address of first item
+    //outputs:
+        // none
+    //storage used:
+        // none
+.bank2_drawGUIRowInGrid
+    .bank2_drawGUIRowInGridLoop
+        lod r3 r6  // get item
+        cal .bank2_drawItemInGrid  // draw item
+        in r0 %screen_nop  // ensure screen queue cleared
+        add r1 r1 9  // increase x by slot size
+        add r6 r6 1  // increase memory index
+        sub r5 r5 1  // decrease loop counter
+        bnz .bank2_drawGUIRowInGridLoop r5 // loop if not done yet
+    ret  // return
+// end bank2_drawGUIRowInGrid function
+
+
+// draw the inventory part of a GUI
+.bank2_drawInventory
+    // draw highlight (black rectangle around GUI)
+    out %screen_x1 19  // top left x
+    out %screen_y1 0  // top left y
+    out %screen_x2 76  // bottom right x
+    out %screen_y2_clearrect 63  // bottom right y
+
+    // draw borders
+    out %screen_x1 20  // top left x
+    out %screen_y1 0  // top left y
+    out %screen_x2 75  // bottom right x
+    out %screen_y2_drawrect 63  // bottom right y
+
+.bank2_drawInventoryOnlyInventoryPart  // skip the top half
+    // draw highlight (black rectangle around GUI)
+    out %screen_x1 19  // top left x
+    out %screen_y1 29  // top left y
+    out %screen_x2 76  // bottom right x
+    out %screen_y2_clearrect 63  // bottom right y
+
+    // draw borders
+    out %screen_x1 20  // top left x
+    out %screen_y1 29  // top left y
+    out %screen_x2 75  // bottom right x
+    out %screen_y2_drawrect 63  // bottom right y
+
+    // draw items
+    imm r1 21  // top left X
+    imm r2 53  // top left y
+    imm r5 5  // length
+    imm r6 inventory  // first item
+    lod r7 inventorySlot  // selected item
+    cal .bank2_drawGUIRow  // draw row of items
+
+    sub r2 r2 12  // move up a row in y coordinate
+    imm r1 21  // top left X
+    imm r5 5  // length
+    lod r7 inventorySlot  // selected item
+    sub r7 r7 0x10  // move up a row in selected item
+    cal .bank2_drawGUIRow  // draw row of items
+
+    sub r2 r2 11  // move up a row in y coordinate
+    imm r1 21  // top left X
+    imm r5 5  // length
+    lod r7 inventorySlot  // selected item
+    sub r7 r7 0x20  // move up a row in selected item
+    cal .bank2_drawGUIRow  // draw row of items
+ret
+
+
+.bank2_addItemToInventory
+    // input: r7 (item)
+    // other registers not necessarily preserved
+    imm r1 0
+    and r6 r7 0xF0  // item id
+    .bank2_addItemToInventoryLoop
+        add r1 r1 inventory  // check what item is already there
+        lod r2 r1
+        bnz ~+3 r2  // no item
+            str r1 r7  // store regardless of what it is
+            ret  // done
+        bge .bank2_addItemToInventoryLoopContinue r7 0xF0  // skip if nonstackable
+        and r3 r2 0xF0  // get item id
+        bne .bank2_addItemToInventoryLoopContinue r6 r3  // skip if not same item id
+        and r4 r2 0x0F  // get item counts
+        and r5 r7 0x0F
+        add r5 r4 r5  // get sum
+        bge .bank2_addItemToInventoryStackTooBig r4 16  // skip if stack too big
+        add r3 r3 r5
+        str r1 r3  // store new, bigger stack
+        ret  // done
+        .bank2_addItemToInventoryStackTooBig
+        or r2 r2 15
+        str r1 r2  // store max size stack
+        sub r5 r5 15  // remaining items
+        add r7 r6 r5  // new item id
+        .bank2_addItemToInventoryLoopContinue
+        sub r1 r1 inventory
+        add r1 r1 1  // continue and check if done
+        brl .bank2_addItemToInventoryLoop r1 15
+    ret
+
+
+
+
+
+
+// try crafting - same subroutine for both 2x2 and 3x3 grids
+.bank2_tryCrafting
+    imm r1 15  // push entire inventory to stack - in case of not enough materials
+    imm r2 inventory
+    .bank2_tryCraftingToStackLoop
+        lod r3 r2
+        psh r3
+        add r2 r2 1
+        sub r1 r1 1
+        bnz .bank2_tryCraftingToStackLoop r1
+
+    imm r1 0  // index in crafting grid
+    .bank2_tryCraftingMainLoop
+        add r2 r1 craftingGrid  // get item id
+        lod r2 r2
+        and r2 r2 0xF0
+        brz .bank2_tryCraftingLoopContinue r2  // continue if no item in that slot
+        imm r3 0  // index in inventory
+        .bank2_tryCraftingSubLoop
+            add r4 r3 inventory  // get inventory item id
+            lod r4 r4
+            and r5 r4 0xF0  // check if same item id
+            bre .bank2_tryCraftingLoopItemMatch r2 r5  // match!
+            add r3 r3 1  // no match - continue
+            brl .bank2_tryCraftingSubLoop r3 15  // if more inventory left, continue
+        jmp .bank2_tryCraftingFailure  // no items of this id remain in inventory
+
+        .bank2_tryCraftingLoopItemMatch
+        sub r4 r4 1  // subtract 1 from item count
+        and r5 r4 0x0F  // check if no items left in stack
+        bnz ~+2 r5
+            imm r4 0  // reset stack if no items left
+        add r3 r3 inventory  // store item back
+        str r3 r4
+        .bank2_tryCraftingLoopContinue
+        add r1 r1 1  // move along to next slot in crafting grid
+        brl .bank2_tryCraftingMainLoop r1 9  // continue if not done all slots
+
+    // success
+        lod r7 craftingOutput  // add crafting output to inventory
+        cal .bank2_addItemToInventory
+
+        imm r1 15  // pop the (garbage) inventory off the stack
+        .bank2_tryCraftingClearStackLoop
+            pop r0
+            sub r1 r1 1
+            bnz .bank2_tryCraftingClearStackLoop r1
+
+        str permanentSelectedSlot 0xFF  // reset permanent selected slot if successful
+        cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
+    ret
+
+    // failure
+    .bank2_tryCraftingFailure
+        imm r2 inventory  // pop entire inventory from stack
+        add r2 r2 14
+        .bank2_tryCraftingFromStackLoop
+            pop r3
+            str r2 r3
+            sub r2 r2 1
+            bge .bank2_tryCraftingFromStackLoop r2 inventory
+        ret
+
+
+
+
+// PLAYER INVENTORY (2x2 crafting grid)
+
+
+
+// draw slot with highlight
+.bank2_inventoryDrawSlotWithHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the crafting grid
+        cal .bank2_drawItemInGrid
+        cal .bank2_drawHighlight
+        ret
+    // outside the crafting grid
+    imm r4 0  // selected item
+    cal .bank2_drawItem
+ret
+
+// draw slot without highlight (also clears highlight)
+.bank2_inventoryDrawSlotWithoutHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the crafting grid
+        cal .bank2_drawItemInGrid
+        cal .bank2_clearHighlight
+        ret
+    // outside the crafting grid
+    imm r4 1  // not selected item
+    cal .bank2_drawItem
+ret
+
+// reset crafting grid
+.bank2_reset2x2CraftingGrid
+    imm r1, craftingGrid  // memory address
+    .bank2_reset2x2CraftingGridLoop  // can use loop counter on chungus
+        str r1 0  // store empty item
+        inc r1 r1
+        ble .bank2_reset2x2CraftingGridLoop r1 craftingOutput  // loop if not done
+
+    // draw background of grid
+    out %screen_x1 26
+    out %screen_y1 9
+    out %screen_x2 44
+    out %screen_y2_clearrect 27
+
+    // draw items in grid
+    imm r7 craftingGrid  // memory address
+    imm r2 9  // y
+
+    imm r1 26  // x
+    imm r5 2  // length
+    mov r6 r7  // memory address
+    cal .bank2_drawGUIRowInGrid
+
+    imm r2 18  // y
+    imm r1 26  // x
+    imm r5 2  // length
+    add r6 r7 3  // memory address
+    cal .bank2_drawGUIRowInGrid
+
+    // draw output item
+    imm r1 60  // x
+    imm r2 14  // y
+    imm r3 0  // no item
+    imm r4 1  // not highlighted
+    cal .bank2_drawItem
+ret
+
+
+// load GUI for open inventory
+.bank2_loadInventoryGUI
+    // draw inventory part and outline
+    cal .bank2_drawInventory
+
+    // draw crafting grid and output item
+    cal .bank2_reset2x2CraftingGrid
+
+    // draw "INVENTORY"
+    out %screen_y1 1  // y
+    out %screen_x1 40  // IN
+    out %screen_texid_drawinvtex 0x70
+    out %screen_x1 48  // VE
+    out %screen_texid_drawinvtex 0x71
+    out %screen_x1 56  // NT
+    out %screen_texid_drawinvtex 0x72
+    out %screen_x1 64  // OR
+    out %screen_texid_drawinvtex 0x73
+    out %screen_x1 72  // Y
+    out %screen_texid_drawinvtex 0x74
+    in r0 %screen_nop  // wait for screen queue to clear
+
+    // draw arrow
+    out %screen_x1 46  // x
+    out %screen_y1 15  // y
+    imm r1 GUI_ARROW
+    out %screen_texid_drawinvtex r1
+    out %screen_x1 54  // new x
+    add r1 r1 1
+    out %screen_texid_drawinvtex r1
+
+    // render and wait for inputs
+    in r0 %screen_buffer
+
+.bank2_inventoryLoop
+    out %playerinput r0 //synchronize playerInput device
+
+    //handle inputs
+
+        in r0 %playerinput //get input
+
+        in r1 %playerinput //is open/close inventory pressed?
+        bnz .continueFromClosingInventory r1
+        
+    // handle inventory movement
+        in r1 %playerinput  // inventory movement
+        lod r2 inventorySlot
+        brz .bank2_inventorySkipMovement r1  // skip if no movement
+
+        lod r7 inventorySlot
+        psh r1
+        cal .bank2_inventoryDrawSlotWithoutHighlight  // remove highlight from previous slot
+        pop r1
+
+        lod r2 inventorySlot
+        brl .bank2_inventoryMoveWithinInventory r2 0x30
+
+            // moving within crafting grid
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x60  // top of crafting grid
+                    imm r2 0x00  // move to bottom of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x60  // bottom of crafting grid
+                    imm r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+3 r1 0x0F  // move left
+                sub r2 r2 1
+                and r2 r2 0xF1  // stay within grid
+            bne ~+3 r1 0x01  // move right
+                add r2 r2 1
+                and r2 r2 0xF1  // stay within grid
+
+            jmp .bank2_inventorySkipMovement
+
+        .bank2_inventoryMoveWithinInventory
+
+            // moving within inventory
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x20  // top of inventory
+                    imm r2 0x50  // move to crafting grid
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x10  // bottom of inventory
+                    add r2 r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of inventory
+                    add r2 r2 0x04  // move to right of inventory
+                    jmp ~+2
+                sub r2 r2 1
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x04  // right of inventory
+                    sub r2 r2 0x04  // move to left of inventory
+                    jmp ~+2
+                add r2 r2 1
+
+        .bank2_inventorySkipMovement
+            str inventorySlot r2  // draw selected slot
+            mov r7 r2
+            cal .bank2_inventoryDrawSlotWithHighlight
+
+            in r1 %playerinput  // craft?
+            brz .bank2_inventorySkipTryCrafting r1  // skip if not necessary
+            lod r1 craftingOutput
+            brz .bank2_inventorySkipTryCrafting r1  // skip if no crafting output
+
+            cal .bank2_tryCrafting  // try and craft
+            lod r7 inventorySlot  // redraw inventory slot (incase modified)
+            cal .bank2_inventoryDrawSlotWithHighlight
+
+        .bank2_inventorySkipTryCrafting
+            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
+            cal .bank2_inventoryDrawSlotWithHighlight
+
+            in r1 %playerinput  // select item?
+            brz .bank2_inventorySkipSelectItem r1  // skip if not necessary
+
+            lod r1 permanentSelectedSlot  // get current permanent slot
+            lod r2 inventorySlot
+            bne .bank2_inventorySelectedAlready r1 0xFF  // already selected
+                // select new slot
+                bge .bank2_inventorySkipSelectItem r2 0x50  // out of bounds - do not select
+                str permanentSelectedSlot r2  // set new permanent slot
+                // NOTE: slot already highlighted (in previous section)
+                jmp .bank2_inventorySkipSelectItem
+            
+            .bank2_inventorySelectedAlready
+            // slot already selected
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            lod r3 r7
+            mov r7 r2  // get memory address of new slot
+            cal .bank2_inventoryGetSlot
+            lod r4 r7
+            str r7 r3  // move item(s) over
+            psh r4  // preserve items
+            mov r7 r2
+            cal .bank2_inventoryDrawSlotWithHighlight
+            pop r4
+            lod r1 permanentSelectedSlot
+            lod r2 inventorySlot
+            bge .bank2_inventoryCheckCrafting r2 0x50  // out of bounds - only move
+
+                // within bounds
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                str r7 r4  // swap items the other way
+                mov r7 r1  // redraw and remove highlight
+                cal .bank2_inventoryDrawSlotWithoutHighlight
+                str permanentSelectedSlot 0xFF  // remove permanent selected slot
+                lod r7 inventorySlot  // redraw slot if needed
+                cal .bank2_inventoryDrawSlotWithHighlight
+                jmp .bank2_inventorySkipSelectItem
+        
+        .bank2_inventoryCheckCrafting
+            // check if a crafting recipe has been made possible
+            out %craftrom 0xFF  // set to crafting mode
+            imm r1 9  // output full crafting grid
+            imm r2 craftingGrid
+            .bank2_inventoryCheckCraftingLoop
+                lod r3 r2
+                out %craftrom r3
+                add r2 r2 1
+                sub r1 r1 1
+                bnz .bank2_inventoryCheckCraftingLoop r1
+            in r3 %craftrom  // get item (if any)
+            str craftingOutput r3  // store
+            // draw output item
+            imm r1 60  // x
+            imm r2 14  // y
+            imm r4 1  // not highlighted
+            cal .bank2_drawItem
+
+        .bank2_inventorySkipSelectItem
+
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+
+            in r1 %playerinput  // clear crafting grid?
+            brz .bank2_inventoryContinue r1
+                cal .bank2_reset2x2CraftingGrid
+                lod r7 inventorySlot  // redraw inventory slot
+                cal .bank2_inventoryDrawSlotWithHighlight
+
+    .bank2_inventoryContinue
+    // render and wait for inputs
+    in r0 %screen_buffer
+    jmp .bank2_inventoryLoop
+
+
+
+
+// CRAFTING INVENTORY (3x3 crafting grid)
+
+
+
+
+// draw slot with highlight
+.bank2_craftingDrawSlotWithHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the crafting grid
+        cal .bank2_drawItemInGrid
+        cal .bank2_drawHighlight
+        ret
+    // outside the crafting grid
+    imm r4 0  // selected item
+    cal .bank2_drawItem
+ret
+
+// draw slot without highlight (also clears highlight)
+.bank2_craftingDrawSlotWithoutHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the crafting grid
+        cal .bank2_drawItemInGrid
+        cal .bank2_clearHighlight
+        ret
+    // outside the crafting grid
+    imm r4 1  // not selected item
+    cal .bank2_drawItem
+ret
+
+// reset crafting grid
+.bank2_reset3x3CraftingGrid
+    imm r1, craftingGrid  // memory address
+    .bank2_reset3x3CraftingGridLoop  // can use loop counter on chungus
+        str r1 0  // store empty item
+        inc r1 r1
+        ble .bank2_reset3x3CraftingGridLoop r1 craftingOutput  // loop if not done
+
+    // draw background of grid
+    out %screen_x1 21
+    out %screen_y1 1
+    out %screen_x2 48
+    out %screen_y2_clearrect 28
+
+    // draw items in grid
+    imm r7 craftingGrid  // memory address
+    imm r2 1  // y
+
+    imm r1 21  // x
+    imm r5 3  // length
+    mov r6 r7  // memory address
+    cal .bank2_drawGUIRowInGrid
+
+    imm r2 10  // y
+    imm r1 21  // x
+    imm r5 3  // length
+    add r6 r7 3  // memory address
+    cal .bank2_drawGUIRowInGrid
+
+    imm r2 19  // y
+    imm r1 21  // x
+    imm r5 3  // length
+    add r6 r7 6  // memory address
+    cal .bank2_drawGUIRowInGrid
+
+    // draw output item
+    imm r1 65  // x
+    imm r2 10  // y
+    imm r3 0  // no item
+    imm r4 1  // not highlighted
+    cal .bank2_drawItem
+ret
+
+
+// load GUI for open crafting grid
+.bank2_loadCraftingGUI
+    // draw inventory part and outline
+    cal .bank2_drawInventory
+
+    // draw crafting grid and output item
+    cal .bank2_reset3x3CraftingGrid
+
+    // draw "INVENTORY"
+    out %screen_y1 1  // y
+    out %screen_x1 56  // CR
+    out %screen_texid_drawinvtex 0x75
+    out %screen_x1 64  // AF
+    out %screen_texid_drawinvtex 0x76
+    out %screen_x1 72  // T
+    out %screen_texid_drawinvtex 0x77
+    in r0 %screen_nop  // wait for screen queue to clear
+
+    // draw arrow
+    out %screen_x1 51  // x
+    out %screen_y1 11  // y
+    imm r1 GUI_ARROW
+    out %screen_texid_drawinvtex r1
+    out %screen_x1 59  // new x
+    add r1 r1 1
+    out %screen_texid_drawinvtex r1
+
+    // render and wait for inputs
+    in r0 %screen_buffer
+
+.bank2_craftingLoop
+    out %playerinput r0 //synchronize playerInput device
+
+    //handle inputs
+
+        in r0 %playerinput //get input
+
+        in r1 %playerinput //is open/close inventory pressed?
+        bnz .continueFromClosingInventory r1
+        
+    // handle inventory movement
+        in r1 %playerinput  // inventory movement
+        lod r2 inventorySlot
+        brz .bank2_craftingSkipMovement r1  // skip if no movement
+
+        lod r7 inventorySlot
+        psh r1
+        cal .bank2_craftingDrawSlotWithoutHighlight  // remove highlight from previous slot
+        pop r1
+
+        lod r2 inventorySlot
+        brl .bank2_craftingMoveWithinInventory r2 0x30
+
+            // moving within crafting grid
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x90  // top of crafting grid
+                    imm r2 0x00  // move to bottom of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x80  // bottom of crafting grid
+                    imm r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of crafting grid
+                    add r2 r2 0x02  // move to right of crafting grid
+                    jmp ~+2
+                sub r2 r2 1
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x02  // right of crafting grid
+                    sub r2 r2 0x02  // move to left of crafting grid
+                    jmp ~+2
+                add r2 r2 1
+
+            jmp .bank2_craftingSkipMovement
+
+        .bank2_craftingMoveWithinInventory
+
+            // moving within inventory
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x20  // top of inventory
+                    imm r2 0x70  // move to crafting grid
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x10  // bottom of inventory
+                    add r2 r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of inventory
+                    add r2 r2 0x04  // move to right of inventory
+                    jmp ~+2
+                sub r2 r2 1
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x04  // right of inventory
+                    sub r2 r2 0x04  // move to left of inventory
+                    jmp ~+2
+                add r2 r2 1
+
+        .bank2_craftingSkipMovement
+            str inventorySlot r2  // draw selected slot
+            mov r7 r2
+            cal .bank2_craftingDrawSlotWithHighlight
+
+            in r1 %playerinput  // craft?
+            brz .bank2_craftingSkipTryCrafting r1  // skip if not necessary
+            lod r1 craftingOutput
+            brz .bank2_craftingSkipTryCrafting r1  // skip if no crafting output
+
+            cal .bank2_tryCrafting  // try and craft
+            lod r7 inventorySlot  // redraw inventory slot (incase modified)
+            cal .bank2_craftingDrawSlotWithHighlight
+
+        .bank2_craftingSkipTryCrafting
+            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
+            cal .bank2_craftingDrawSlotWithHighlight
+
+            in r1 %playerinput  // select item?
+            brz .bank2_craftingSkipSelectItem r1  // skip if not necessary
+
+            lod r1 permanentSelectedSlot  // get current permanent slot
+            lod r2 inventorySlot
+            bne .bank2_craftingSelectedAlready r1 0xFF  // already selected
+                // select new slot
+                bge .bank2_craftingSkipSelectItem r2 0x70  // out of bounds - do not select
+                str permanentSelectedSlot r2  // set new permanent slot
+                // NOTE: slot already highlighted (in previous section)
+                jmp .bank2_craftingSkipSelectItem
+            
+            .bank2_craftingSelectedAlready
+            // slot already selected
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            lod r3 r7
+            mov r7 r2  // get memory address of new slot
+            cal .bank2_inventoryGetSlot
+            lod r4 r7
+            str r7 r3  // move item(s) over
+            psh r4  // preserve items
+            mov r7 r2
+            cal .bank2_craftingDrawSlotWithHighlight
+            pop r4
+            lod r1 permanentSelectedSlot
+            lod r2 inventorySlot
+            bge .bank2_craftingCheckCrafting r2 0x70  // out of bounds - only move
+
+                // within bounds
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                str r7 r4  // swap items the other way
+                mov r7 r1  // redraw and remove highlight
+                cal .bank2_craftingDrawSlotWithoutHighlight
+                str permanentSelectedSlot 0xFF  // remove permanent selected slot
+                lod r7 inventorySlot  // redraw slot if needed
+                cal .bank2_craftingDrawSlotWithHighlight
+                jmp .bank2_craftingSkipSelectItem
+        
+        .bank2_craftingCheckCrafting
+            // check if a crafting recipe has been made possible
+            out %craftrom 0xFF  // set to crafting mode
+            imm r1 9  // output full crafting grid
+            imm r2 craftingGrid
+            .bank2_craftingCheckCraftingLoop
+                lod r3 r2
+                out %craftrom r3
+                add r2 r2 1
+                sub r1 r1 1
+                bnz .bank2_craftingCheckCraftingLoop r1
+            in r3 %craftrom  // get item (if any)
+            str craftingOutput r3  // store
+            // draw output item
+            imm r1 65  // x
+            imm r2 10  // y
+            imm r4 1  // not highlighted
+            cal .bank2_drawItem
+
+        .bank2_craftingSkipSelectItem
+
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
+
+            in r1 %playerinput  // clear crafting grid?
+            brz .bank2_craftingContinue r1
+                cal .bank2_reset3x3CraftingGrid
+                lod r7 inventorySlot  // redraw inventory slot
+                cal .bank2_craftingDrawSlotWithHighlight
+
+    .bank2_craftingContinue
+    // render and wait for inputs
+    in r0 %screen_buffer
+    jmp .bank2_craftingLoop
+
+
+
+// FURNACE GUI
+
+
+
+
+// CHEST GUI
