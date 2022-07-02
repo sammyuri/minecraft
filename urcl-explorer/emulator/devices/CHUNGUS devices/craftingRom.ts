@@ -39,23 +39,33 @@ export class CraftingRom implements Device {
     inputs = {
         [IO_Port.CRAFTROM]: () => {
             if (this.station == Station.table) {
-                while (true) { //shift the recipe as far left in the crafting grid as it will go
+                for (let i = 0; i < 2; i++) { //shift the recipe as far left in the crafting grid as it will go
                     if (this.currentRecipe[0] + this.currentRecipe[3] + this.currentRecipe[6] == "000") {
                         this.currentRecipe = this.currentRecipe.substring(1) + "0";
                     } else {
                         break;
                     }
                 }
-                while (true) { //shift the recipe as far up in the crafting grid as it will go
+                for (let i = 0; i < 2; i++) { //shift the recipe as far up in the crafting grid as it will go
                     if (this.currentRecipe.substring(0, 3) == "000") {
                         this.currentRecipe = this.currentRecipe.substring(3) + "000";
                     } else {
                         break;
                     }
                 }
-                return this.recipes[this.currentRecipe.toUpperCase()]
+                this.currentRecipe = this.currentRecipe.toLocaleUpperCase();
+                if (this.currentRecipe in this.recipes) {
+                    return this.recipes[this.currentRecipe];
+                } else {
+                    return 0;
+                }
             } else {
-                return this.recipes[this.currentRecipe[8].toUpperCase()]
+                this.currentRecipe = this.currentRecipe.toLocaleUpperCase();
+                if (this.currentRecipe in this.recipes) {
+                    return this.recipes[this.currentRecipe];
+                } else {
+                    return 0;
+                }
             }
         }
     };
