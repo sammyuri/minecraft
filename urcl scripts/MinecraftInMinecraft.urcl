@@ -17,7 +17,8 @@ minstack 23
         @define GRAVITY 15 //the downwards change in velocity per frame
         @define JUMPSTRENGTH 17 //the initial vertical velocity of a jump
         @define SPEEDFACTOR 0b01_000000 //scales the speed of the characters movement. A value of 1 results in a speed of 4 while crouching, 8 while walking, and 12 while sprinting. In 0bSX.XXXXXX format
-        @define RAYCASTMAXLENGTH 0b0100_0000
+        @define RAYCASTMAXLENGTH 0x40 //4 blocks
+        @define REQUIREDBREAKSTRENGTH 8
     //other constants
         @define BOTTOMOFSTACK 66 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -72,16 +73,18 @@ minstack 23
         @define ITEM_FURNACE 0xFE
         @define ITEM_CHEST 0xFF
     //textures
-        @define NUMBER 0x20
-        @define STACKABLE_TEXTURE 0x40
-        @define NONSTACKABLE_TEXTURE 0x50
-        @define GUI_EMPTY 0x61
-        @define GUI_ARROW 0x63
-        @define GUI_SMELTING 0x65
+        @define TEXTURE_NUMBER 0x20
+        @define TEXTURE_STACKABLE 0x40
+        @define TEXTURE_NONSTACKABLE 0x50
+        @define TEXTURE_GUI_EMPTY 0x61
+        @define TEXTURE_GUI_ARROW 0x63
+        @define TEXRURE_GUI_SMELTING 0x65
         @define TEXTURE_INVENTORY 0x70
         @define TEXTURE_CRAFT 0x75
         @define TEXTURE_FURNACE 0x78
         @define TEXTURE_CHEST 0x7C
+        @define TEXTURE_HIGHLIGHT0 0x19
+        @define TEXTURE_HIGHLIGHT7 0x20
 
 //memory locations
     //OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
@@ -100,11 +103,11 @@ minstack 23
     @define prevTargetY m12 //4 bits
     @define inventory m13 //NOTE: takes up 15 cells (m13-m27), 8 bits each
     @define inventorySlot m28 //8 bits
-    @define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current
+    //@define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current //NOTE: this address no longer in use 
     @define targetXZ m30 //8 bits XXXX_ZZZZ
     @define targetY m31 //4 bits
-    @define craftingGrid m32 //NOTE: takes up 9 cells (m32-m40), 8 bits each
-    @define craftingOutput m41 //8 bits
+    @define craftingGrid m32 //NOTE: takes up 9 cells (m32-m40), 8 bits each //NOTE: these cells can be used again in portions of the code that don't interfere with crafting.
+    @define craftingOutput m41 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
     @define permanentSelectedSlot m42 //8 bits
 
 //initial values
@@ -124,10 +127,9 @@ minstack 23
     str targetXZ 0xff
     str targetY 0x0f
     str permanentSelectedSlot 0xFF  // outside the inventory
-    
 
-str m13 0x14
-str m14 0x55
+lstr inventory 0 0x14
+lstr inventory 1 0x55
 
 
 .mainLoop
@@ -171,19 +173,6 @@ str m14 0x55
             sete r7 r4 r7
             and r6 r6 r7 //r6 = is the target the same as last frame?
             in r7 %playerinput //r7 = is break pressed?
-            psh r7 //save input
-                and r6 r6 r7 //r7 is the target the same as last frame AND break pressed?
-                lod r7 breakPhase //r7 = breakPhase
-                bnz ~+4 r6 //target has changed:
-                    bsl r6 r7 4 //move current breakphase to old breakphase and set current breakphase to 0.
-                    str breakPhase r6
-                    jmp ~+5
-                //target hasn't changed:
-                    bsl r6 r7 4
-                    and r7 r7 0x0f
-                    or r6 r6 r7 //copy current breakphase into old breakphase without changing current breakphase.
-                    str breakPhase r6
-            pop r7 //r7 = is break pressed?
             lod r6 inventorySlot
             add r6 inventory r6 //r6 = pointer towards item in hand
             lod r6 r6 //r6 = item in hand
@@ -191,28 +180,56 @@ str m14 0x55
             brz .endBreakBlock r7
                 brn .endBreakBlock r5 //if bedrock, can't break block
                 
-                lod r7 breakPhase
-                //TODO: check what item is in hand to get the appropriate strength
-                addv r7 r7 0x01 //increase block-breaking progress //TEMP: repace the '0x01' here with the strength of the held too against the targeted block
-                and r6 r7 0x0f //r6 = current breakphase
-                bge .finishBreakingBlock r6 8
-                    str breakPhase r7
-                    in r0 %playerinput //keep playerInput device synced
-                    jmp .endBreakAndPlace
-                .finishBreakingBlock
-                    and r7 r7 0xf0
-                    str breakPhase r7
-                    bsr r7 r3 4
-                    out %blockram_x r7
-                    and r7 r3 0x0f
-                    out %blockram_z r7
-                    out %blockram_y r4
-                    //TODO: drop item entity if the held tool is appropriate
-                    out %blockram_id 0 //replace targeted block with air
-                    //TODO: check if block above this block is sand, if so, make it fall
-                    str needReRender @max
-                    in r0 %playerinput //keep playerInput device synced
-                    jmp .endBreakAndPlace
+                //TODO: add block-breaking animation
+                    cal .getRayCastTargetQuad
+                    //stack:
+                        //vert4x sp+15
+                        //vert3x sp+14
+                        //vert2x sp+13
+                        //vert1x sp+12
+                        //vert4y sp+11
+                        //vert3y sp+10
+                        //vert2y sp+9
+                        //vert1y sp+8
+                        //vert4z sp+7
+                        //vert3z sp+6
+                        //vert2z sp+5
+                        //vert1z sp+4
+                        //vert4uv sp+3
+                        //vert3uv sp+2
+                        //vert2uv sp+1
+                        //vert1uv sp+0
+                    //TODO: check what item is in hand to get the appropriate strength
+                        imm r7 3 //r7 = breaking strength //TEMP: replace '3' with whatever the breaking strength is
+                    imm r6 TEXTURE_HIGHLIGHT0
+                    .blockBreakAnimLoop
+                        cal .buildQuadFromStack
+                        out %amogus_settings 0b1101
+                        out %amogus_tex r6
+                        in r0 %amogus_drawquad //TODO: replace the break textures to only include the new pixels each phase
+                        inc r6 r6
+                        imm r2 0
+                        .blockBreakAnimDelayLoop //this loop lasts shorter the higher breakstrength is
+                            add r2 r2 r7
+                            out %wait 50 //replace this code on CHUNGUS with any slow code. r1 should currently be free
+                            in r0 %wait 
+                        ble .blockBreakAnimDelayLoop r2 16
+                        in r0 %amogus_drawtoscreen
+                        in r0 %screen_buffer
+                        //TODO: convert drawUI into a function, and call it from here as well as when rendering at the end
+                    brl .blockBreakAnimLoop r6 TEXTURE_HIGHLIGHT7
+                    imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
+                bsr r7 r3 4
+                out %blockram_x r7
+                and r7 r3 0x0f
+                out %blockram_z r7
+                out %blockram_y r4
+                //TODO: drop item entity if the held tool is appropriate
+                out %blockram_id 0 //replace targeted block with air
+                //TODO: check if block above this block is sand, if so, make it fall
+                str needReRender @max
+                in r0 %playerinput //keep playerInput device synced
+                jmp .endBreakAndPlace
             .endBreakBlock
             in r7 %playerinput //is place pressed?
             brz .endBreakAndPlace r7
@@ -226,6 +243,7 @@ str m14 0x55
                 out %blockram_z r7
                 out %blockram_y r2
                 out %blockram_id BLOCK_GRASS //TEMP: replace grass with whatever is currently held
+                str needReRender @max
             jmp .endBreakAndPlace
             .noRayCastHit
                 str targetXZ 0xff
@@ -432,29 +450,7 @@ str m14 0x55
                 str prevZ r2
                 bne .doFullRender r1 r2
             
-        //if full render not necessary, do partial render (render overlay on targeted block):
-            //clear old overlay:
-                lod r1 prevTargetXZ
-                brn .drawCurrentOverlay r1 //if highest bit is active, block is out of bounds.
-                out %meshgen_blockxz r1
-                lod r1 prevTargetY
-                out %meshgen_blocky r1
-                lod r1 breakPhase
-                bsr r1 r1 4
-                out %meshgen_breakphase r1
-                in r0 %meshgen_renderoverlay
-            .drawCurrentOverlay
-                lod r1 targetXZ
-                brn .endPartialRender r1 //if highest bit is active, block is out of bounds.
-                out %meshgen_blockxz r1
-                lod r1 targetY
-                out %meshgen_blocky r1
-                lod r1 breakPhase
-                and r1 r1 0x0f
-                out %meshgen_breakphase r1
-                in r0 %meshgen_renderoverlay
-            .endPartialRender
-            in r0 %amogus_drawtoscreen
+        //if full render not necessary:
             imm r1 50 //TEMP: this simulates a faster frame when you don't need to simulate the entire sccene.
         jmp .renderUI
 
@@ -484,21 +480,22 @@ str m14 0x55
 
             //TODO: render chests and furnace faces
 
-            lod r1 targetXZ
-            out %meshgen_blockxz r1
-            lod r1 targetY
-            out %meshgen_blocky r1
-            lod r1 breakPhase
-            and r1 r1 0x0f
-            out %meshgen_breakphase r1
-            in r0 %meshgen_renderoverlay
+            //render target highlight
+                cal .rayCast
+                brz ~+7 r5 //if raycast hits nothing, don't render a highlight
+                    cal .getRayCastTargetQuad
+                    cal .buildQuadFromStack
+                    out %amogus_settings 0b1101
+                    out %amogus_tex TEXTURE_HIGHLIGHT0
+                    in r0 %amogus_drawquad
+                    imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
 
             //TODO: render item entities
 
             in r0 %amogus_drawtoscreen
             imm r1 @max //TEMP: this simulates the lag from drawing the entire screen in-game
         .renderUI
-            out %wait r1 //TEMP: r1 is set based on what type of frame was draw. Full-render frames are much slower.
+            out %wait r1 //TEMP: r1 is set based on what type of frame was drawn. Full-render frames are much slower.
             in r0 %wait
             // draw hotbar
                 // draw highlight (black rectangle around hotbar)
@@ -525,7 +522,7 @@ str m14 0x55
 jmp .mainLoop
 
 
-//rayCast function //NOTE: there is still a lot of room for OPTIMimization in this section of code. Most of it can probably be reused instead of repeated.
+//rayCast function //OPTIM: there is still a lot of room for optimization in this section of code. Most of it can probably be reused instead of repeated.
     //description:
         //casts a ray from the position and direction of the camera, and returns what it hits
     //inputs:
@@ -728,6 +725,193 @@ jmp .mainLoop
 ret
 
 
+.getRayCastTargetQuad 
+    //get quad vertices //OPTIM: there is almost certainly a better way to do this
+        brg .targetPosYQuad r2 r4
+        brl .targetNegYQuad r2 r4
+        and r6 r1 0xf0 //r6 = rayCastPrevX
+        and r7 r3 0xf0 //r7 = rayCastcurrX
+        brg .targetPosXQuad r6 r7
+        brl .targetNegXQuad r6 r7
+        and r6 r1 0x0f //r6 = rayCastPrevZ
+        and r7 r3 0x0f //r7 = rayCastcurrZ
+        brg .targetPosZQuad r6 r7
+        //brl .targetNegXQuad r6 r7
+        .targetNegZQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+            
+            add r6 r6 16
+            psh r6 //vert4x
+            psh r6 //vert3x
+            sub r6 r6 16
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            psh r7 //vert4z
+            psh r7 //vert3z
+            psh r7 //vert2z
+            psh r7 //vert1z
+
+            bsl r7 r4 4
+            add r6 r7 16
+            psh r7 //vert4y
+            psh r6 //vert3y
+            psh r6 //vert2y
+            psh r7 //vert1y
+
+            jmp .endGetQuad
+        .targetPosZQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+
+            psh r6 //vert4x
+            psh r6 //vert3x
+            add r6 r6 16
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            add r6 r7 16
+            psh r6 //vert4z
+            psh r6 //vert3z
+            psh r6 //vert2z
+            psh r6 //vert1z
+
+            bsl r7 r4 4
+            add r6 r7 16
+            psh r7 //vert4y
+            psh r6 //vert3y
+            psh r6 //vert2y
+            psh r7 //vert1y
+
+            jmp .endGetQuad
+        .targetNegXQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+
+            psh r6 //vert4x
+            psh r6 //vert3x
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            add r6 r7 16
+            psh r7 //vert4z
+            psh r7 //vert3z
+            psh r6 //vert2z
+            psh r6 //vert1z
+
+            bsl r7 r4 4
+            add r6 r7 16
+            psh r7 //vert4y
+            psh r6 //vert3y
+            psh r6 //vert2y
+            psh r7 //vert1y
+
+            jmp .endGetQuad
+        .targetPosXQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+            add r6 r6 16
+            psh r6 //vert4x
+            psh r6 //vert3x
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            add r6 r7 16
+            psh r6 //vert4z
+            psh r6 //vert3z
+            psh r7 //vert2z
+            psh r7 //vert1z
+
+            bsl r7 r4 4
+            add r6 r7 16
+            psh r7 //vert4y
+            psh r6 //vert3y
+            psh r6 //vert2y
+            psh r7 //vert1y
+
+            jmp .endGetQuad
+        .targetNegYQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+            
+            add r6 r6 16
+            psh r6 //vert4x
+            psh r6 //vert3x
+            sub r6 r6 16
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            add r6 r7 16
+            psh r6 //vert4z
+            psh r7 //vert3z
+            psh r7 //vert2z
+            psh r6 //vert1z
+
+            bsl r7 r4 4
+            psh r7 //vert4y
+            psh r7 //vert3y
+            psh r7 //vert2y
+            psh r7 //vert1y
+
+            jmp .endGetQuad
+        .targetPosYQuad
+            and r6 r3 0xf0 //r6 = X
+            bsl r7 r3 4 //r7 = Z
+            //r4 = Y
+            
+            add r6 r6 16
+            psh r6 //vert4x
+            psh r6 //vert3x
+            sub r6 r6 16
+            psh r6 //vert2x
+            psh r6 //vert1x
+
+            add r6 r7 16
+            psh r7 //vert4z
+            psh r6 //vert3z
+            psh r6 //vert2z
+            psh r7 //vert1z
+
+            bsl r7 r4 4
+            add r6 r7 16
+            psh r6 //vert4y
+            psh r6 //vert3y
+            psh r6 //vert2y
+            psh r6 //vert1y
+        .endGetQuad
+        psh 0x80 //vert4uv
+        psh 0x88 //vert3uv
+        psh 0x08 //vert2uv
+        psh 0x00 //vert1uv
+ret //NOTE: this only works with a callstack because of stack stuff
+
+.buildQuadFromStack
+    psh r0
+    psh r0
+    psh r0
+    psh r0 //add 4 junk values to stack so we can safely pop them.
+    imm r2 0
+    .buildQuadFromStackLoop
+        llod r1 sp 4
+        out %amogus_vertuv r1
+        llod r1 sp 8
+        out %amogus_verty r1
+        llod r1 sp 12
+        out %amogus_vertz r1
+        llod r1 sp 16 //NOTE: there are ways to decrease this number if it's too large
+        out %amogus_vertx r1
+        in r0 %amogus_submitvert
+        inc r2 r2
+        pop r0 //on CHUNGUS, this can be combined with the last LLOD instruction
+    brl .buildQuadFromStackLoop r2 4 //loop exactly 4 times
+ret
+
 
 //drawItem function
     //description:
@@ -782,12 +966,12 @@ ret
     bge .drawItemNonstackable r3 0xF0 // check if item is nonstackable
         // draw stackable item
         bsr r4 r3 4  // get item id
-        add r4 r4 STACKABLE_TEXTURE  // draw item texture
+        add r4 r4 TEXTURE_STACKABLE  // draw item texture
         out %screen_texid_drawtex r4
 
         // draw item count
         and r3 r3 0x0F  // get item count
-        add r3 r3 NUMBER  // get background texture
+        add r3 r3 TEXTURE_NUMBER  // get background texture
         add r1 r1 2  // move x,y over to correct position
         add r2 r2 2
         out %screen_x1 r1  // draw background texture
@@ -805,7 +989,7 @@ ret
     .drawItemNonstackable
         // draw nonstackable item
         and r3 r3 0x0F  // get item id
-        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        add r3 r3 TEXTURE_NONSTACKABLE  // draw item texture
         out %screen_texid_drawtex r3
         jmp .drawItemReturn  // return
 // end drawItem function
@@ -960,18 +1144,18 @@ ret
     bge .bank2_drawItemNonstackable r3 0xF0 // check if item is nonstackable
         // draw stackable item
         bsr r4 r3 4  // get item id
-        add r4 r4 STACKABLE_TEXTURE  // draw item texture
+        add r4 r4 TEXTURE_STACKABLE  // draw item texture
         out %screen_texid_drawtex r4
 
         // draw item count
         and r3 r3 0x0F  // get item count
-        add r3 r3 NUMBER  // get background texture
+        add r3 r3 TEXTURE_NUMBER  // get background texture
         add r1 r1 2  // move x,y over to correct position
         add r2 r2 2
         out %screen_x1 r1  // draw background texture
         out %screen_y1 r2
         out %screen_texid_drawtex r3
-        add r3 r3 0x10  // get number texture
+        add r3 r3 0x10  // get TEXTURE_number texture
         out %screen_texid_drawinvtex r3
 
         // return
@@ -983,7 +1167,7 @@ ret
     .bank2_drawItemNonstackable
         // draw nonstackable item
         and r3 r3 0x0F  // get item id
-        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        add r3 r3 TEXTURE_NONSTACKABLE  // draw item texture
         out %screen_texid_drawtex r3
         jmp .bank2_drawItemReturn  // return
 // end bank2_drawItem function
@@ -1109,7 +1293,7 @@ ret
     out %screen_y1 r2
     bnz .bank2_drawItemInGridNonZero r3  // check if item exists (ie. not 00000000)
 
-        out %screen_texid_drawtex GUI_EMPTY  // draw empty item
+        out %screen_texid_drawtex TEXTURE_GUI_EMPTY  // draw empty item
         .bank2_drawItemInGridReturn
         sub r1 r1 1  // preserve x,y
         sub r2 r2 1
@@ -1119,7 +1303,7 @@ ret
     bge .bank2_drawItemInGridNonstackable r3 0xF0 // check if item is nonstackable
         // draw stackable item
         bsr r3 r3 4  // get item id
-        add r3 r3 STACKABLE_TEXTURE  // draw item texture
+        add r3 r3 TEXTURE_STACKABLE  // draw item texture
         out %screen_texid_drawtex r3
         // no need to draw item count as at most 1 in grid
         jmp .bank2_drawItemInGridReturn  // return
@@ -1127,7 +1311,7 @@ ret
     .bank2_drawItemInGridNonstackable
         // draw nonstackable item
         and r3 r3 0x0F  // get item id
-        add r3 r3 NONSTACKABLE_TEXTURE  // draw item texture
+        add r3 r3 TEXTURE_NONSTACKABLE  // draw item texture
         out %screen_texid_drawtex r3
         jmp .bank2_drawItemInGridReturn  // return
 // end bank2_drawItemInGrid function
@@ -1224,23 +1408,23 @@ ret
         bge .bank2_addItemToInventoryLoopContinue r7 0xF0  // skip if nonstackable
         and r3 r2 0xF0  // get item id
         bne .bank2_addItemToInventoryLoopContinue r6 r3  // skip if not same item id
-        and r4 r2 0x0F  // get item counts
-        and r5 r7 0x0F
-        add r5 r4 r5  // get sum
-        bge .bank2_addItemToInventoryStackTooBig r4 16  // skip if stack too big
-        add r3 r3 r5
-        str r1 r3  // store new, bigger stack
-        ret  // done
-        .bank2_addItemToInventoryStackTooBig
-        or r2 r2 15
-        str r1 r2  // store max size stack
-        sub r5 r5 15  // remaining items
-        add r7 r6 r5  // new item id
+            and r4 r2 0x0F  // get item counts
+            and r5 r7 0x0F
+            add r5 r4 r5  // get sum
+            bge .bank2_addItemToInventoryStackTooBig r4 16  // skip if stack too big
+                add r3 r3 r5
+                str r1 r3  // store new, bigger stack
+                ret  // done
+            .bank2_addItemToInventoryStackTooBig
+            or r2 r2 15
+            str r1 r2  // store max size stack
+            sub r5 r5 15  // remaining items
+            add r7 r6 r5  // new item id
         .bank2_addItemToInventoryLoopContinue
         sub r1 r1 inventory
         add r1 r1 1  // continue and check if done
-        brl .bank2_addItemToInventoryLoop r1 15
-    ret
+    brl .bank2_addItemToInventoryLoop r1 15
+ret
 
 
 
@@ -1420,7 +1604,7 @@ ret
     // draw arrow
     out %screen_x1 46  // x
     out %screen_y1 15  // y
-    imm r1 GUI_ARROW
+    imm r1 TEXTURE_GUI_ARROW
     out %screen_texid_drawinvtex r1
     out %screen_x1 54  // new x
     add r1 r1 1
@@ -1707,7 +1891,7 @@ ret
     // draw arrow
     out %screen_x1 51  // x
     out %screen_y1 11  // y
-    imm r1 GUI_ARROW
+    imm r1 TEXTURE_GUI_ARROW
     out %screen_texid_drawinvtex r1
     out %screen_x1 59  // new x
     add r1 r1 1
@@ -1889,9 +2073,9 @@ ret
 
 
 
-// FURNACE GUI
+//TODO: FURNACE GUI
 
 
 
 
-// CHEST GUI
+//TODO: CHEST GUI

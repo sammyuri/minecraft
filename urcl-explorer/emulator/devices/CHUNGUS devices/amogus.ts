@@ -54,8 +54,8 @@ export class Amogus implements Device {
             this.currentVertex.z = i;
         },
         [IO_Port.AMOGUS_VERTUV]: (i:number) => {
-            this.currentVertex.u = i >> 4;
-            this.currentVertex.v = i & 0xF;
+            this.currentVertex.u = (i >> 4) / 8;
+            this.currentVertex.v = (i & 0xF) / 8;
         },
         [IO_Port.AMOGUS_TEX]: (i:number) => {
             this.texture = i;
