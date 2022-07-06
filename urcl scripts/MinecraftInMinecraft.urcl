@@ -18,7 +18,8 @@ minstack 23
         @define JUMPSTRENGTH 17 //the initial vertical velocity of a jump
         @define SPEEDFACTOR 0b01_000000 //scales the speed of the characters movement. A value of 1 results in a speed of 4 while crouching, 8 while walking, and 12 while sprinting. In 0bSX.XXXXXX format
         @define RAYCASTMAXLENGTH 0x40 //4 blocks
-        @define REQUIREDBREAKSTRENGTH 8
+        //@define REQUIREDBREAKSTRENGTH 8
+        @define BREAKTIME 24 //scales how much time it takes to break a block
     //other constants
         @define BOTTOMOFSTACK 66 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -72,6 +73,22 @@ minstack 23
         @define ITEM_TABLE 0xFD
         @define ITEM_FURNACE 0xFE
         @define ITEM_CHEST 0xFF
+    //entity IDs
+        @define ENTITY_STICK 0x1
+        @define ENTITY_DIRT 0x2
+        @define ENTITY_APPLE 0x3
+        @define ENTITY_COBBLE 0x4
+        @define ENTITY_LOG 0x5
+        @define ENTITY_LEAVES 0x6
+        @define ENTITY_PLANK 0x7
+        @define ENTITY_COAL 0x8
+        @define ENTITY_IRONORE 0x9
+        @define ENTITY_SAND 0xA
+        @define ENTITY_FALLINGSAND 0xB
+        @define ENTITY_SAPLING 0xC
+        @define ENTITY_TABLE 0xD
+        @define ENTITY_FURNACE 0xE
+        @define ENTITY_CHEST 0xF
     //textures
         @define TEXTURE_NUMBER 0x20
         @define TEXTURE_STACKABLE 0x40
@@ -85,6 +102,24 @@ minstack 23
         @define TEXTURE_CHEST 0x7C
         @define TEXTURE_HIGHLIGHT0 0x19
         @define TEXTURE_HIGHLIGHT7 0x20
+    //other
+        @define TOOL_PICKAXE 0
+        @define TOOL_AXE 1
+        @define TOOL_SHOVEL 2
+        @define TOOL_SWORD 3
+
+        @define STRENGTHFORITEM 3
+        @define STRENGTH_FIST 4
+        @define STRENGTH_WOOD 5
+        @define STRENGTH_STONE 6
+        @define STRENGTH_IRON 7
+
+        @define BLOCKTYPE_STONE 0
+        @define BLOCKTYPE_WOOD 1
+        @define BLOCKTYPE_SOFT 2
+        @define BLOCKTYPE_LEAVES 3
+        @define BLOCKTYPE_GLASS 4
+        @define BLOCKTYPE_SAPLING 5
 
 //memory locations
     //OPTIM: it might be worth placing some of these at the base of the stack instead of the heap to reduce cache misses
@@ -99,13 +134,13 @@ minstack 23
     @define prevX m8 //7 bits
     @define prevY m9 //8 bits
     @define prevZ m10 //7 bits
-    @define prevTargetXZ m11 //8 bits XXXX_ZZZZ
-    @define prevTargetY m12 //4 bits
+    //@define prevTargetXZ m11 //8 bits XXXX_ZZZZ //NOTE: this address no longer in use
+    //@define prevTargetY m12 //4 bits //NOTE: this address no longer in use
     @define inventory m13 //NOTE: takes up 15 cells (m13-m27), 8 bits each
     @define inventorySlot m28 //8 bits
     //@define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current //NOTE: this address no longer in use 
-    @define targetXZ m30 //8 bits XXXX_ZZZZ
-    @define targetY m31 //4 bits
+    //@define targetXZ m30 //8 bits XXXX_ZZZZ //NOTE: this address no longer in use
+    //@define targetY m31 //4 bits //NOTE: this address no longer in use
     @define craftingGrid m32 //NOTE: takes up 9 cells (m32-m40), 8 bits each //NOTE: these cells can be used again in portions of the code that don't interfere with crafting.
     @define craftingOutput m41 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
     @define permanentSelectedSlot m42 //8 bits
@@ -122,14 +157,11 @@ minstack 23
     str prevX 0
     str prevY 0
     str prevZ 0
-    str prevTargetXZ 0xff
-    str prevTargetY 0x0f
-    str targetXZ 0xff
-    str targetY 0x0f
     str permanentSelectedSlot 0xFF  // outside the inventory
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
+lstr inventory 2 ITEM_IRONSHOVEL
 
 
 .mainLoop
@@ -163,24 +195,12 @@ lstr inventory 1 0x55
                 //r4: y pos of first found block
                 //r5: id of first found block (returns air if nothing found, bedrock will return -1)
                 //r6: length of raycast (returns -1 if nothing found)
-            lod r7 targetXZ
-            str prevTargetXZ r7
-            str targetXZ r3
-            sete r6 r3 r7
-            lod r7 targetY
-            str prevTargetY r7
-            str targetY r4
-            sete r7 r4 r7
-            and r6 r6 r7 //r6 = is the target the same as last frame?
             in r7 %playerinput //r7 = is break pressed?
-            lod r6 inventorySlot
-            add r6 inventory r6 //r6 = pointer towards item in hand
-            lod r6 r6 //r6 = item in hand
             brz .noRayCastHit r5
             brz .endBreakBlock r7
                 brn .endBreakBlock r5 //if bedrock, can't break block
-                
-                //TODO: add block-breaking animation
+                bre .endBlockBreakAnim r5 BLOCK_SAPLING //break block instantly if it's a sapling
+                //add block-breaking animation
                     cal .getRayCastTargetQuad
                     //stack:
                         //vert4x sp+15
@@ -199,32 +219,113 @@ lstr inventory 1 0x55
                         //vert3uv sp+2
                         //vert2uv sp+1
                         //vert1uv sp+0
-                    //TODO: check what item is in hand to get the appropriate strength
-                        imm r7 3 //r7 = breaking strength //TEMP: replace '3' with whatever the breaking strength is
+                    //check what item is in hand to get the appropriate strength
+                        lod r6 inventorySlot //r6 = item in hand
+                        add r6 inventory r6
+                        lod r6 r6
+                        brl .breakWithoutTool r6 ITEM_NONSTACKABLE
+                        brg .breakWithoutTool r6 ITEM_SHEARS
+                        bre .breakWithShears r6 ITEM_SHEARS
+                        and r7 r6 0x03
+                        bsr r6 r6 2
+                        and r6 r6 0b11 //r6 = tool tier
+                        add r6 r6 STRENGTH_WOOD //r6 = tool strength
+                        brz .breakWithPickaxe r7 //TOOL_PICKAXE
+                        bre .breakWithAxe r7 TOOL_AXE
+                        bre .breakWithShovel r7 TOOL_SHOVEL
+                        jmp .breakWithoutTool
+                        .breakWithShears
+                            bne .breakWithoutTool r5 BLOCK_LEAVES
+                            imm r6 STRENGTH_IRON //r6 = tool strength
+                            jmp .endGetBreakStrength
+                        .breakWithPickaxe
+                            cal .getBlockType //r7 = blockType
+                            bne .breakWithoutTool r7 BLOCKTYPE_STONE
+                            jmp .endGetBreakStrength
+                        .breakWithAxe
+                            cal .getBlockType //r7 = blockType
+                            bne .breakWithoutTool r7 BLOCKTYPE_WOOD
+                            jmp .endGetBreakStrength
+                        .breakWithShovel
+                            cal .getBlockType //r7 = blockType
+                            bne .breakWithoutTool r7 BLOCKTYPE_SOFT
+                            jmp .endGetBreakStrength
+                        .breakWithoutTool
+                            imm r6 STRENGTH_FIST //r6 = tool strength
+                        .endGetBreakStrength
+                            cal .getBlockHardness
+                            sub r7 r6 r7 //r7 = break strength
                     imm r6 TEXTURE_HIGHLIGHT0
                     .blockBreakAnimLoop
+                        inc r6 r6
                         cal .buildQuadFromStack
                         out %amogus_settings 0b1101
                         out %amogus_tex r6
-                        in r0 %amogus_drawquad //TODO: replace the break textures to only include the new pixels each phase
-                        inc r6 r6
+                        in r0 %amogus_drawquad
                         imm r2 0
                         .blockBreakAnimDelayLoop //this loop lasts shorter the higher breakstrength is
                             add r2 r2 r7
                             out %wait 50 //replace this code on CHUNGUS with any slow code. r1 should currently be free
                             in r0 %wait 
-                        ble .blockBreakAnimDelayLoop r2 16
+                        ble .blockBreakAnimDelayLoop r2 BREAKTIME
                         in r0 %amogus_drawtoscreen
+                        //NOTE: if r1 gets used above, push it to the stack here
+                        psh r2
+                        psh r3
+                        psh r4
+                        psh r5
+                        psh r6
+                        psh r7
+                            cal .drawHotbar
+                        pop r7
+                        pop r6
+                        pop r5
+                        pop r4
+                        pop r3
+                        pop r2
+                        //NOTE: if r1 gets used above, pop it from the stack here
                         in r0 %screen_buffer
-                        //TODO: convert drawUI into a function, and call it from here as well as when rendering at the end
-                    brl .blockBreakAnimLoop r6 TEXTURE_HIGHLIGHT7
+                    ble .blockBreakAnimLoop r6 TEXTURE_HIGHLIGHT7
                     imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
+                .endBlockBreakAnim
+                    brl .endDropItem r7 STRENGTHFORITEM //if break strength is insufficient don't drop an item
+                    bre .endDropItem r5 BLOCK_GLASS
+                    bne ~+4 r5 BLOCK_GRASS
+                        imm r5 ENTITY_DIRT
+                        cal .createEntity
+                        jmp .endDropItem
+                    bne ~+4 r5 BLOCK_STONE
+                        imm r5 ENTITY_COBBLE
+                        cal .createEntity
+                        jmp .endDropItem
+                    bre .breakLeavesDropItem r5 BLOCK_LEAVES
+                    //default
+                        cal .createEntity
+                        jmp .endDropItem
+                    .breakLeavesDropItem
+                        bre ~+3 r7 STRENGTH_IRON //if using shears, drop leaves item
+                            //r5 is already leaves entity ID
+                            cal .createEntity
+                            jmp .endDropItem
+                        in r1 %rng
+                        bge ~+4 r1 25 // 25/256 chance of dropping sapling
+                            imm r5 ENTITY_SAPLING
+                            cal .createEntity
+                            jmp .endDropItem
+                        bge ~+4 r1 35 // 10/256 chance of dropping stick
+                            imm r5 ENTITY_STICK
+                            cal .createEntity
+                            jmp .endDropItem
+                        brg ~+3 r1 37 // 2/256 chance of dropping apple
+                            imm r5 ENTITY_APPLE
+                            cal .createEntity
+                    //jmp .endDropItem
+                .endDropItem
                 bsr r7 r3 4
                 out %blockram_x r7
                 and r7 r3 0x0f
                 out %blockram_z r7
                 out %blockram_y r4
-                //TODO: drop item entity if the held tool is appropriate
                 out %blockram_id 0 //replace targeted block with air
                 //TODO: check if block above this block is sand, if so, make it fall
                 str needReRender @max
@@ -246,8 +347,6 @@ lstr inventory 1 0x55
                 str needReRender @max
             jmp .endBreakAndPlace
             .noRayCastHit
-                str targetXZ 0xff
-                str targetY 0x0f
                 in r7 %playerinput //is place pressed?
                 //TODO: check if item in hand is usable without a target, if not, skip to .endBreakAndPlace
             .useNonPlaceable
@@ -497,30 +596,123 @@ lstr inventory 1 0x55
         .renderUI
             out %wait r1 //TEMP: r1 is set based on what type of frame was drawn. Full-render frames are much slower.
             in r0 %wait
-            // draw hotbar
-                // draw highlight (black rectangle around hotbar)
-                out %screen_x1 19  // top left x
-                out %screen_y1 51  // top left y
-                out %screen_x2 76  // bottom right x
-                out %screen_y2_clearrect 63  // bottom right y
-                // draw borders
-                out %screen_x1 20  // top left x
-                out %screen_y1 52  // top left y
-                out %screen_x2 75  // bottom right x
-                out %screen_y2_drawrect 63  // bottom right y
-                // draw items
-                imm r1 21  // top left x
-                imm r2 53  // top left y
-                imm r5 5  // length of hotbar
-                imm r6 inventory  // load memory address of hotbar items
-                lod r7 inventorySlot  // get selected item
-                cal .drawGUIRow
+            cal .drawHotbar
+                
 
     //do end of frame cleanup + wait for next frame
         in r0 %screen_buffer
         str needReRender 0
 jmp .mainLoop
 
+//createEntity function: creates a new item entity based on a location and an entity ID
+    //inputs:
+        //r3: X, Z block position of entity //NOTE: must be preserved
+        //r4: Y block position of entity //NOTE: must be preserved
+        //r5: ID of entity
+    //outputs:
+        //none
+.createEntity
+    //TODO: create entity
+    out %hex r3
+    out %text ' '
+    out %int r4
+    out %text ' '
+    out %int r5
+    out %text '\n'
+ret
+
+//getBlockType function: returns the type of block based on a block ID
+    //inputs:
+        //r5: block ID
+    //outputs:
+        //r7: block type
+.getBlockType
+    //stone blocks: stone, cobble, iron ore, coal ore, furnace
+        bre ~+5 r5 BLOCK_STONE
+        bre ~+4 r5 BLOCK_COBBLE
+        bre ~+3 r5 BLOCK_IRONORE
+        bre ~+2 r5 BLOCK_COALORE
+        bne ~+3 r5 BLOCK_FURNACE
+            imm r7 BLOCKTYPE_STONE
+            ret
+    //wood blocks: plank, log, crafting table, chest
+        bre ~+4 r5 BLOCK_PLANK
+        bre ~+3 r5 BLOCK_LOG
+        bre ~+2 r5 BLOCK_TABLE
+        bne ~+3 r5 BLOCK_CHEST
+            imm r7 BLOCKTYPE_WOOD
+            ret
+    //soft blocks: sand, dirt, grass
+        bre ~+3 r5 BLOCK_SAND
+        bre ~+2 r5 BLOCK_DIRT
+        bne ~+3 r5 BLOCK_GRASS
+            imm r7 BLOCKTYPE_SOFT
+            ret
+    //leaves: leaves
+        bne ~+3 r5 BLOCK_LEAVES
+            imm r7 BLOCKTYPE_LEAVES
+            ret
+    //glass: glass
+        bne ~+3 r5 BLOCK_GLASS
+            imm r7 BLOCKTYPE_GLASS
+            ret
+    //sapling: sapling
+        imm r7 BLOCKTYPE_SAPLING
+ret
+
+//getBlockHardness function: returns the hardness of a block based on block ID
+    //inputs:
+        //r5: block ID
+    //outputs:
+        //r7: block hardness
+.getBlockHardness
+    //N/A: sapling
+    //hardness 0: leaves, sand, dirt, grass
+        bre ~+4 r5 BLOCK_LEAVES
+        bre ~+3 r5 BLOCK_SAND
+        bre ~+2 r5 BLOCK_DIRT
+        bne ~+3 r5 BLOCK_GRASS
+            imm r7 0
+            ret
+    //hardness 1: log, plank, table, chest, glass
+        bre ~+5 r5 BLOCK_GLASS
+        bre ~+4 r5 BLOCK_PLANK
+        bre ~+3 r5 BLOCK_LOG
+        bre ~+2 r5 BLOCK_TABLE
+        bne ~+3 r5 BLOCK_CHEST
+            imm r7 1
+            ret
+    //hardness 2: stone, cobble, furnace, coal ore
+        bre ~+4 r5 BLOCK_STONE
+        bre ~+3 r5 BLOCK_COBBLE
+        bre ~+2 r5 BLOCK_COALORE
+        bne ~+3 r5 BLOCK_FURNACE
+            imm r7 2
+            ret
+    //hardness 3: iron ore
+        imm r7 3
+ret
+    
+
+.drawHotbar //TODO: add rendering the selected item in your hand
+    // draw highlight (black rectangle around hotbar)
+    out %screen_x1 19  // top left x
+    out %screen_y1 51  // top left y
+    out %screen_x2 76  // bottom right x
+    out %screen_y2_clearrect 63  // bottom right y
+    // draw borders
+    out %screen_x1 20  // top left x
+    out %screen_y1 52  // top left y
+    out %screen_x2 75  // bottom right x
+    out %screen_y2_drawrect 63  // bottom right y
+    // draw items
+    imm r1 21  // top left x
+    imm r2 53  // top left y
+    imm r5 5  // length of hotbar
+    imm r6 inventory  // load memory address of hotbar items
+    lod r7 inventorySlot  // get selected item
+    cal .drawGUIRow
+ret
 
 //rayCast function //OPTIM: there is still a lot of room for optimization in this section of code. Most of it can probably be reused instead of repeated.
     //description:
