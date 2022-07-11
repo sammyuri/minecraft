@@ -13,7 +13,7 @@ def translate(lines: list[Instruction]) -> list[str]:
         except AssemblerError as error:
             # Add line number (from original source code) to error
             raise AssemblerError(
-                f"Error on line {instr.linenum}: {error}"
+                f"Error on line {instr.linenum} ({instr.text}): {error}"
             ) from None
         else:
             result.append(machinecode)

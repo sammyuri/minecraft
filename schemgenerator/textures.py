@@ -1,5 +1,6 @@
 from tkinter import *
 from textschem import generate_schematic
+from json import dumps
 
 def resetdata():
     with open("data.txt", "w") as f:
@@ -13,6 +14,11 @@ def getdata():
 def writedata(data):
     with open("data.txt", "w") as f:
         f.write("".join(data))
+    jsondata = []
+    for i in range(256):
+        jsondata.append(list(map(int, data[64 * i:64 * (i + 1)])))
+    with open("textures.json", "w") as f:
+        f.write(dumps(jsondata))
 
 def clicked(event):
     x, y = event.x, event.y

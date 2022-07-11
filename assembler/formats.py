@@ -72,7 +72,7 @@ LAYOUTS = {
     "SHF": ("11010", "REG", "REG", "BITS", "REG"),
     "SFI": ("11011", "REG", "REG", "BITS", "IMM_3"),
     "MUL": ("11100", "REG", "REG", "BITS", "REG"),
-    "UDA": ("11101", "REG", "REG", "IMM_2", "REG"),
+    "UDA": ("11101", "REG", "REG", "BITS", "REG"),
     "UDB": ("11110", "REG", "REG", "IMM_2", "REG"),
     "BCT": ("11111", "REG", "REG", "BITS", "REG"),
 }
@@ -108,6 +108,7 @@ ALIAS = {
     "BSLI": "SFI",     "BSRI": "SFI",     "ROTI": "SFI",     "SXTSRI": "SFI",
     "MULU": "MUL",     "DIV": "MUL",      "MOD": "MUL",
     "SQRT": "BCT",     "LZR": "BCT",      "TZR": "BCT",
+    "SMUL446": "UDA",  "SDIV444": "UDA",  "SDIV446": "UDA",
 }
 
 BITS = {
@@ -129,4 +130,5 @@ BITS = {
     "BSLI": "00",      "BSRI": "01",      "ROTI": "10",      "SXTSRI": "11",
     "MUL": "00",       "MULU": "01",      "DIV": "10",       "MOD": "11",
     "SQRT": "00",      "BCT": "11",       "LZR": "01",       "TZR": "10",
+    "SMUL446": "00",   "SDIV444": "01",   "SDIV446": "10",
 }

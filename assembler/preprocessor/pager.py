@@ -29,6 +29,26 @@ def parse_labelled_pages(lines: list[Instruction]) -> list[Instruction]:
             instructioncount = 0
             pagecount += 1
 
+        elif instr.text[0:5] == ".BANK":
+            if instructioncount > 64:
+                raise AssemblerError(
+                    f"Page {pagecount} too large, contains {instructioncount} \
+                      instructions (max 64 allowed)"
+                ) from None
+
+            resultlines.extend([
+                Instruction("NOP", instructioncount)  # Placeholder line number
+                for i in range(64 - instructioncount)
+            ])
+            instructioncount = 0
+            pagecount += 1
+            while pagecount < 32:
+                pagecount += 1
+                resultlines.extend([
+                    Instruction("NOP", instructioncount)  # Placeholder line number
+                    for i in range(64)
+                ])
+
         # Otherwise, add to resultlines
         else:
             resultlines.append(instr)

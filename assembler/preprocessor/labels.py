@@ -10,7 +10,7 @@ def parse_labels(lines: list[Instruction]) -> list[Instruction]:
     while index < len(lines):
         if lines[index].is_label():
             # Add to label dict and remove from lines
-            labels[lines[index].text] = str(index)
+            labels[lines[index].text] = str(index % 2048)
             lines.pop(index)
         else:
             index += 1

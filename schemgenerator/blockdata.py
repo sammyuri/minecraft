@@ -69,7 +69,7 @@ def generate_block_data(
             ]
             for bit in range(16):
 
-                x = 4 * (instruction // 16)
+                x = 4 * ((instruction % 256) // 16)
                 if bit > 7 and instruction % 32 < 16:
                     x += 2
                 if bit < 8 and instruction % 32 > 15:

@@ -30,7 +30,7 @@ def find_macros(lines: list[Instruction]) -> tuple[
     index = 0
     while index < len(lines):
         # Regular instruction
-        if lines[index].text[0:7] != "@DEFINE":
+        if lines[index].text[0:7].upper() != "@DEFINE":
             resultlines.append(lines[index])
             index += 1
             continue
