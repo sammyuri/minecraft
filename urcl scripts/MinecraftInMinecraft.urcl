@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 43
+minheap 39
 minstack 23
 
 //constants
@@ -11,7 +11,7 @@ minstack 23
         @define PLAYERHALFWIDTH 5
         @define PLAYERCAMHEIGHT 24
         @define PLAYERCROUCHCAMHEIGHT 22
-        @define MIDDLEOFVOID 0b1100_0000
+        @define MIDDLEOFVOID 0b1010_0000
         @define BLOCKMIDDLEOFVOID 0b1100
     //gameplay constants
         @define GRAVITY 15 //the downwards change in velocity per frame
@@ -20,8 +20,12 @@ minstack 23
         @define RAYCASTMAXLENGTH 0x40 //4 blocks
         //@define REQUIREDBREAKSTRENGTH 8
         @define BREAKTIME 24 //scales how much time it takes to break a block
+        @define MAXHEALTH 8 //NOTE: doesn't affect health rendering
+        @define APPLEHEALTH 2
+        @define MINFALLDAMAGESPEED 32
+        @define FALLDAMAGESCALING 0b00_001000
     //other constants
-        @define BOTTOMOFSTACK 66 //in URCX: minreg + minheap. in CHUNGUS: 0
+        @define BOTTOMOFSTACK 62 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -102,6 +106,8 @@ minstack 23
         @define TEXTURE_CHEST 0x7C
         @define TEXTURE_HIGHLIGHT0 0x19
         @define TEXTURE_HIGHLIGHT7 0x20
+        @define TEXTURE_HEARTEMPTY 0xfe
+        @define TEXTURE_HEARTFULL 0xff
     //other
         @define TOOL_PICKAXE 0
         @define TOOL_AXE 1
@@ -136,14 +142,15 @@ minstack 23
     @define prevZ m10 //7 bits
     //@define prevTargetXZ m11 //8 bits XXXX_ZZZZ //NOTE: this address no longer in use
     //@define prevTargetY m12 //4 bits //NOTE: this address no longer in use
-    @define inventory m13 //NOTE: takes up 15 cells (m13-m27), 8 bits each
-    @define inventorySlot m28 //8 bits
+    @define inventory m11 //NOTE: takes up 15 cells (m13-m27), 8 bits each
+    @define inventorySlot m26 //8 bits
     //@define breakPhase m29 //8 bits 0PPP_0CCC P=previous C=current //NOTE: this address no longer in use 
     //@define targetXZ m30 //8 bits XXXX_ZZZZ //NOTE: this address no longer in use
     //@define targetY m31 //4 bits //NOTE: this address no longer in use
-    @define craftingGrid m32 //NOTE: takes up 9 cells (m32-m40), 8 bits each //NOTE: these cells can be used again in portions of the code that don't interfere with crafting.
-    @define craftingOutput m41 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
-    @define permanentSelectedSlot m42 //8 bits
+    @define craftingGrid m27 //NOTE: takes up 9 cells (m32-m40), 8 bits each //NOTE: these cells can be used again in portions of the code that don't interfere with crafting.
+    @define craftingOutput m36 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
+    @define permanentSelectedSlot m37 //8 bits
+    @define health m38
 
 //initial values
     str x 0x10
@@ -158,10 +165,12 @@ minstack 23
     str prevY 0
     str prevZ 0
     str permanentSelectedSlot 0xFF  // outside the inventory
+    str health 6 //TEMP: replace the 6 with MAXHEALTH
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
+lstr inventory 3 ITEM_APPLE
 
 
 .mainLoop
@@ -308,15 +317,15 @@ lstr inventory 2 ITEM_IRONSHOVEL
                             cal .createEntity
                             jmp .endDropItem
                         in r1 %rng
-                        bge ~+4 r1 25 // 25/256 chance of dropping sapling
+                        bge ~+4 r1 50 // 50/256 chance of dropping sapling
                             imm r5 ENTITY_SAPLING
                             cal .createEntity
                             jmp .endDropItem
-                        bge ~+4 r1 35 // 10/256 chance of dropping stick
+                        bge ~+4 r1 70 // 20/256 chance of dropping stick
                             imm r5 ENTITY_STICK
                             cal .createEntity
                             jmp .endDropItem
-                        brg ~+3 r1 37 // 2/256 chance of dropping apple
+                        brg ~+3 r1 80 // 10/256 chance of dropping apple
                             imm r5 ENTITY_APPLE
                             cal .createEntity
                     //jmp .endDropItem
@@ -335,22 +344,104 @@ lstr inventory 2 ITEM_IRONSHOVEL
             in r7 %playerinput //is place pressed?
             brz .endBreakAndPlace r7
                 lod r7 crouching
-                //TODO: check if targeted block is usable, if so, use it
-                //TODO: check if item in hand is usable without target, if so, jump to .useNonPlaceable
-                //TODO: check if item in hand is placeable, if so place it
-                bsr r7 r1 4
-                out %blockram_x r7
-                and r7 r1 0x0f
-                out %blockram_z r7
-                out %blockram_y r2
-                out %blockram_id BLOCK_GRASS //TEMP: replace grass with whatever is currently held
-                str needReRender @max
+                brl .endUseTargetedBlock r5 BLOCK_TABLE //check if targeted block is usable, if so, use it
+                    //TODO: use targeted block
+                .endUseTargetedBlock
+                lod r6 inventorySlot
+                add r6 inventory r6
+                lod r6 r6 //r6 = item in hand
+                //check if item in hand is placeable, if not, jump to .useNonPlaceable
+                    bge ~+6 r6 ITEM_TABLE //if nonstackable placeable, jump 6 lines 
+                    bge .useNonPlaceable r6 ITEM_IRONINGOT
+                    brz .useNonPlaceable r6
+                    bre .useNonPlaceable r6 ITEM_COAL
+                //get ID of block to place
+                    bsr r6 r6 4
+                    jmp ~+2
+                        and r6 r6 0x0f //jump here if item was nonstackable placable
+                //prepare block RAM                
+                    bsr r7 r1 4
+                    out %blockram_x r7
+                    out %blockram_y r2
+                    and r7 r1 0x0f
+                    out %blockram_z r7
+                bne .endCheckIfCanPlaceSapling r6 BLOCK_SAPLING //if placing sapling, check if it can be placed at the targted location
+                    dec r3 r2
+                    out %blockram_y r3
+                    in r3 %blockram_id
+
+                    brg .endBreakAndPlace r3 BLOCK_DIRT
+                    brl .endBreakAndPlace r3 BLOCK_GRASS
+                    out %blockram_y r2
+                    jmp .placeBlock
+                .endCheckIfCanPlaceSapling
+
+                //check if targeted space intersects player
+                    lod r3 x //r3 = player min x
+                    and r4 r1 0xf0 //r4 = block min x
+                    add r5 r4 0x10 //r5 = block max x
+                    bge .endCheckIfIntersectPlayer r3 r5
+                    add r3 r3 PLAYERWIDTH //player max x
+                    ble .endCheckIfIntersectPlayer r3 r4
+
+                    lod r3 y //r3 = player min y
+                    bsl r4 r2 4 //r4 = block min y
+                    add r5 r4 0x10 //r5 = block max y
+                    bge .endCheckIfIntersectPlayer r3 r5
+                    add r3 r3 PLAYERWIDTH //player max y
+                    ble .endCheckIfIntersectPlayer r3 r4
+
+                    lod r3 z //r3 = player min z
+                    bsl r4 r1 4 //r4 = block min z
+                    add r5 r4 0x10 //r5 = block max z
+                    bge .endCheckIfIntersectPlayer r3 r5
+                    add r3 r3 PLAYERWIDTH //player max z
+                    ble .endCheckIfIntersectPlayer r3 r4
+                    jmp .endBreakAndPlace
+                .endCheckIfIntersectPlayer
+                
+                bne .placeBlock r6 BLOCK_SAND
+                    dec r3 r2
+                    out %blockram_y r3
+                    in r3 %blockram_id
+                    bnz .placeBlock r3
+                    mov r3 r1
+                    mov r4 r2
+                    imm r5 ENTITY_FALLINGSAND
+                    cal .createEntity
+                    jmp .removeItemFromInventory
+                .placeBlock
+                    out %blockram_id r6
+                    .removeItemFromInventory
+                        lod r1 inventorySlot
+                        add r1 inventory r1
+                        lod r2 r1
+                        brl ~+4 r2 0xf0
+                            str r1 0
+                            str needReRender @max
+                            jmp .endBreakAndPlace
+                        dec r2 r2
+                        and r3 r2 0x0f
+                        brz ~-5 r3
+                        str r1 r2
+                    str needReRender @max
             jmp .endBreakAndPlace
             .noRayCastHit
                 in r7 %playerinput //is place pressed?
-                //TODO: check if item in hand is usable without a target, if not, skip to .endBreakAndPlace
+                brz .endBreakAndPlace r7
             .useNonPlaceable
-                //TODO: use nonplaceable items
+                lod r1 inventorySlot
+                add r1 inventory r1
+                lod r2 r1
+                bne .endBreakAndPlace r2 ITEM_APPLE
+                    //increase health
+                        lod r3 health
+                        add r3 r3 APPLEHEALTH
+                        ble ~+2 r3 MAXHEALTH
+                            imm r3 MAXHEALTH
+                        str health r3
+                    //remove apple from inventory
+                        str r1 0
         .endBreakAndPlace
 
         //handle crouching inputs
@@ -489,6 +580,20 @@ lstr inventory 2 ITEM_IRONSHOVEL
                                         mov r7 r1
                                     pop r1
                                     bne .collideResolveEnd r7 y //if main axis is y axis and collision detected in negative direction, player is on ground
+                                    //do fall damage
+                                            lod r3 velY
+                                            neg r3 r3
+                                            sub r3 r3 MINFALLDAMAGESPEED
+                                            brn .endFallDamage r3
+                                                smlt446 r3 r3 FALLDAMAGESCALING
+                                                psh r2
+                                                    lod r2 health
+                                                    sub r2 r2 r3
+                                                    brn .gameOver r2
+                                                    brz .gameOver r2
+                                                    str health r2
+                                                pop r2
+                                        .endFallDamage
                                         str onGround @max
                                         str velY 0
                                         jmp .collideResolveEnd
@@ -521,10 +626,26 @@ lstr inventory 2 ITEM_IRONSHOVEL
 
             //collide with bedrock
                 lod r1 y
-                ble ~+4 r1 MIDDLEOFVOID
+                ble .endCollideWithBedrock r1 MIDDLEOFVOID
                     str y 0
+                    //do fall damage
+                        lod r1 velY
+                        neg r1 r1
+                        sub r1 r1 MINFALLDAMAGESPEED
+                        brn .endFallDamageBedrock r1
+                            smlt446 r1 r1 FALLDAMAGESCALING
+                            psh r2
+                                lod r2 health
+                                sub r2 r2 r1
+                                brn .gameOver r2
+                                brz .gameOver r2
+                                str health r2
+                            pop r2
+                    .endFallDamageBedrock
+                    
                     str onGround @max
                     str velY 0
+            .endCollideWithBedrock
         
         in r0 %playerinput //is delete item pressed?
 
@@ -603,6 +724,12 @@ lstr inventory 2 ITEM_IRONSHOVEL
         in r0 %screen_buffer
         str needReRender 0
 jmp .mainLoop
+
+.gameOver
+    in r0 %screen_clearscreen
+    //TODO: draw game over message to screen
+    in r0 %screen_buffer
+hlt
 
 //createEntity function: creates a new item entity based on a location and an entity ID
     //inputs:
@@ -692,7 +819,8 @@ ret
     //hardness 3: iron ore
         imm r7 3
 ret
-    
+
+ 
 
 .drawHotbar //TODO: add rendering the selected item in your hand
     // draw highlight (black rectangle around hotbar)
@@ -712,6 +840,25 @@ ret
     imm r6 inventory  // load memory address of hotbar items
     lod r7 inventorySlot  // get selected item
     cal .drawGUIRow
+    //draw hearts
+    out %screen_y1 43
+    imm r1 19
+    .drawEmptyHeartsLoop
+        out %screen_x1 r1
+        out %screen_texid_drawinvtex TEXTURE_HEARTEMPTY
+        add r1 r1 6
+    ble .drawEmptyHeartsLoop r1 61
+    imm r1 19
+    imm r2 1
+    lod r3 health
+    .drawFullHeartsLoop
+        brl ~+6 r3 r2
+        out %screen_x1 r1
+        out %screen_texid_drawtex TEXTURE_HEARTFULL
+        add r1 r1 6
+        inc r2 r2
+    ble .drawFullHeartsLoop r1 61
+
 ret
 
 //rayCast function //OPTIM: there is still a lot of room for optimization in this section of code. Most of it can probably be reused instead of repeated.
