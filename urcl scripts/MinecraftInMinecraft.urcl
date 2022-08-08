@@ -170,7 +170,7 @@ minstack 23
 lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
-lstr inventory 3 ITEM_APPLE
+lstr inventory 3 0xE2
 
 
 .mainLoop
@@ -433,15 +433,20 @@ lstr inventory 3 ITEM_APPLE
                 lod r1 inventorySlot
                 add r1 inventory r1
                 lod r2 r1
-                bne .endBreakAndPlace r2 ITEM_APPLE
+                and r3 r2 0xF0
+                bne .endBreakAndPlace r3 ITEM_APPLE
                     //increase health
                         lod r3 health
                         add r3 r3 APPLEHEALTH
                         ble ~+2 r3 MAXHEALTH
                             imm r3 MAXHEALTH
                         str health r3
-                    //remove apple from inventory
-                        str r1 0
+                    //decrease size of apple stack by 1
+                        subv r2 r2 0x01
+                        brg ~+2 r2 ITEM_APPLE
+                            imm r2 0
+                        str r1 r2
+
         .endBreakAndPlace
 
         //handle crouching inputs
