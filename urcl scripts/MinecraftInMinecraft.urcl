@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 39
+minheap 52
 minstack 23
 
 //constants
@@ -25,7 +25,7 @@ minstack 23
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
     //other constants
-        @define BOTTOMOFSTACK 62 //in URCX: minreg + minheap. in CHUNGUS: 0
+        @define BOTTOMOFSTACK 75 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -151,6 +151,7 @@ minstack 23
     @define craftingOutput m36 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
     @define permanentSelectedSlot m37 //8 bits
     @define health m38
+    @define loadedTileEntity m39
 
 //initial values
     str x 0x10
@@ -166,6 +167,8 @@ minstack 23
     str prevZ 0
     str permanentSelectedSlot 0xFF  // outside the inventory
     str health 6 //TEMP: replace the 6 with MAXHEALTH
+
+    str loadedTileEntity m40
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
@@ -183,8 +186,10 @@ lstr inventory 3 0xE2
         //handle miscellaneous inputs
             in r1 %playerinput //is open/close inventory pressed?
             bnz .bank2_loadInventoryGUI r1  //open inventory
+            jmp ~+2
             
         .continueFromClosingInventory  // if inventory closed, continue from here
+            str needReRender @max
 
             in r1 %playerinput //inventory movement
             lod r2 inventorySlot
@@ -1401,9 +1406,14 @@ ret
         sub r6 52 r6  // y
         add r5 r5 21  // x
         ret
-    bge ~+7 r7 0x50  // within chest
+    bge ~+12 r7 0x50  // within chest
         sub r6 r6 3
         mlt r7 r6 5  // memory address
+        psh r1
+        lod r1 loadedTileEntity
+        add r7 r7 r1
+        add r7 r7 2
+        pop r1
         cal .bank2_multiplyXAndYBy11
         sub r6 18 r6  // y
         add r5 r5 21  // x
@@ -2422,4 +2432,167 @@ ret
 
 
 
-//TODO: CHEST GUI
+// CHEST GUI
+
+
+
+
+// draw slot with highlight
+.bank2_chestDrawSlotWithHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    imm r4 0  // selected item
+    cal .bank2_drawItem
+ret
+
+// draw slot without highlight (also clears highlight)
+.bank2_chestDrawSlotWithoutHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    imm r4 1  // not selected item
+    cal .bank2_drawItem
+ret
+
+
+// load GUI for open crafting grid
+.bank2_loadChestGUI
+    // draw inventory part and outline
+    cal .bank2_drawInventory
+
+    // draw items
+    imm r1 21  // top left X
+    imm r2 18  // top left y
+    imm r5 5  // length
+    lod r6 loadedTileEntity  // first item
+    add r6 r6 2
+    lod r7 inventorySlot  // selected item
+    sub r7 r7 0x30  // move up a row in selected item
+    cal .bank2_drawGUIRow  // draw row of items
+
+    sub r2 r2 11  // move up a row in y coordinate
+    imm r1 21  // top left X
+    imm r5 5  // length
+    lod r7 inventorySlot  // selected item
+    sub r7 r7 0x40  // move up a row in selected item
+    cal .bank2_drawGUIRow  // draw row of items
+
+    // draw "INVENTORY"
+    out %screen_y1 1  // y
+    out %screen_x1 56  // CH
+    out %screen_texid_drawinvtex 0x7c
+    out %screen_x1 64  // ES
+    out %screen_texid_drawinvtex 0x7d
+    out %screen_x1 72  // T
+    out %screen_texid_drawinvtex 0x7e
+    in r0 %screen_nop  // wait for screen queue to clear
+
+    // render and wait for inputs
+    in r0 %screen_buffer
+
+.bank2_chestLoop
+    out %playerinput r0 //synchronize playerInput device
+
+    //handle inputs
+
+        in r0 %playerinput //get input
+
+        in r1 %playerinput //is open/close inventory pressed?
+        bnz .continueFromClosingInventory r1
+        
+    // handle inventory movement
+        in r1 %playerinput  // inventory movement
+        lod r2 inventorySlot
+        brz .bank2_chestSkipMovement r1  // skip if no movement
+
+        lod r7 inventorySlot
+        psh r1
+        cal .bank2_chestDrawSlotWithoutHighlight  // remove highlight from previous slot
+        pop r1
+
+        lod r2 inventorySlot
+            // moving within inventory
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x50  // top of inventory
+                    sub r2 r2 0x40  // move to crafting grid
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x10  // bottom of inventory
+                    add r2 r2 0x40  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of inventory
+                    add r2 r2 0x04  // move to right of inventory
+                    jmp ~+2
+                sub r2 r2 1
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x04  // right of inventory
+                    sub r2 r2 0x04  // move to left of inventory
+                    jmp ~+2
+                add r2 r2 1
+
+        .bank2_chestSkipMovement
+            str inventorySlot r2  // draw selected slot
+            mov r7 r2
+            cal .bank2_chestDrawSlotWithHighlight
+
+            in r1 %playerinput  // craft? (unnecessary)
+
+            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
+            cal .bank2_chestDrawSlotWithHighlight
+
+            in r1 %playerinput  // select item?
+            brz .bank2_chestSkipSelectItem r1  // skip if not necessary
+
+            lod r1 permanentSelectedSlot  // get current permanent slot
+            lod r2 inventorySlot
+            bne .bank2_chestSelectedAlready r1 0xFF  // already selected
+                // select new slot
+                bge .bank2_chestSkipSelectItem r2 0x70  // out of bounds - do not select
+                str permanentSelectedSlot r2  // set new permanent slot
+                // NOTE: slot already highlighted (in previous section)
+                jmp .bank2_chestSkipSelectItem
+            
+            .bank2_chestSelectedAlready
+            // slot already selected
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            lod r3 r7
+            mov r7 r2  // get memory address of new slot
+            cal .bank2_inventoryGetSlot
+            lod r4 r7
+            str r7 r3  // move item(s) over
+            psh r4  // preserve items
+            mov r7 r2
+            cal .bank2_chestDrawSlotWithHighlight
+            pop r4
+            lod r1 permanentSelectedSlot
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            str r7 r4  // swap items the other way
+            mov r7 r1  // redraw and remove highlight
+            cal .bank2_chestDrawSlotWithoutHighlight
+            str permanentSelectedSlot 0xFF  // remove permanent selected slot
+            lod r7 inventorySlot  // redraw slot if needed
+            cal .bank2_chestDrawSlotWithHighlight
+    .bank2_chestSkipSelectItem
+    // render and wait for inputs
+    in r0 %screen_buffer
+    jmp .bank2_chestLoop
+
+
