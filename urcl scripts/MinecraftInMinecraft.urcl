@@ -99,7 +99,7 @@ minstack 23
         @define TEXTURE_NONSTACKABLE 0x50
         @define TEXTURE_GUI_EMPTY 0x61
         @define TEXTURE_GUI_ARROW 0x63
-        @define TEXRURE_GUI_SMELTING 0x65
+        @define TEXTURE_GUI_SMELTING 0x67
         @define TEXTURE_INVENTORY 0x70
         @define TEXTURE_CRAFT 0x75
         @define TEXTURE_FURNACE 0x78
@@ -174,6 +174,9 @@ lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
 lstr inventory 3 0xE2
+
+
+jmp .bank2_loadFurnaceGUI
 
 
 .mainLoop
@@ -1440,8 +1443,18 @@ ret
         sub r6 19 r6  // y
         add r5 r5 21  // x
         ret
-    // TODO: furnace
-
+    bge ~+6 r7 0xB0  // furnace bottom slot
+        imm r5 30
+        imm r6 19
+        lod r7 loadedTileEntity
+        add r7 r7 2
+        ret
+    bge ~+6 r7 0xC0  // furnace top slot
+        imm r5 30
+        imm r6 1
+        lod r7 loadedTileEntity
+        add r7 r7 3
+        ret
     imm r6 0xFF  // out of bounds
 ret
 
@@ -1753,6 +1766,31 @@ ret
     // other registers not necessarily preserved
     imm r1 0
     and r6 r7 0xF0  // item id
+    bre .bank2_skipStackLoop r6 0xF0  // skip if nonstackable
+    .bank2_addItemToInventoryStackLoop
+        add r1 r1 inventory  // check what item is already there
+        lod r2 r1
+        and r3 r2 0xF0
+        bne .bank2_addItemToInventoryStackLoopContinue r3 r6  // ensure same item ID
+            and r4 r2 0x0F  // get item counts
+            and r5 r7 0x0F
+            add r5 r4 r5  // get sum
+            bge .bank2_addItemToInventoryStackStackTooBig r5 16  // skip if stack too big
+                add r3 r3 r5
+                str r1 r3  // store new, bigger stack
+                ret  // done
+            .bank2_addItemToInventoryStackStackTooBig
+            or r2 r2 15
+            str r1 r2  // store max size stack
+            sub r5 r5 15  // remaining items
+            add r7 r6 r5  // new item id
+        .bank2_addItemToInventoryStackLoopContinue
+        sub r1 r1 inventory
+        add r1 r1 1  // continue and check if done
+    brl .bank2_addItemToInventoryStackLoop r1 15
+        
+    .bank2_skipStackLoop
+    imm r1 0
     .bank2_addItemToInventoryLoop
         add r1 r1 inventory  // check what item is already there
         lod r2 r1
@@ -1765,7 +1803,7 @@ ret
             and r4 r2 0x0F  // get item counts
             and r5 r7 0x0F
             add r5 r4 r5  // get sum
-            bge .bank2_addItemToInventoryStackTooBig r4 16  // skip if stack too big
+            bge .bank2_addItemToInventoryStackTooBig r5 16  // skip if stack too big
                 add r3 r3 r5
                 str r1 r3  // store new, bigger stack
                 ret  // done
@@ -2120,6 +2158,7 @@ ret
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
 
             in r1 %playerinput  // clear crafting grid?
             brz .bank2_inventoryContinue r1
@@ -2413,6 +2452,7 @@ ret
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
+            in r0 %playerinput  // garbage
 
             in r1 %playerinput  // clear crafting grid?
             brz .bank2_craftingContinue r1
@@ -2427,7 +2467,243 @@ ret
 
 
 
-//TODO: FURNACE GUI
+// FURNACE GUI
+
+
+
+
+// draw slot with highlight
+.bank2_furnaceDrawSlotWithHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the furnace
+        cal .bank2_drawItemInGrid
+        cal .bank2_drawHighlight
+        ret
+    // outside the furnace
+    imm r4 0  // selected item
+    cal .bank2_drawItem
+ret
+
+// draw slot without highlight (also clears highlight)
+.bank2_furnaceDrawSlotWithoutHighlight
+    // input: r7 (slot)
+    // does not preserve registers
+    cal .bank2_inventoryGetSlot
+    bne ~+2 r6 0xFF  // out of bounds - skip
+        ret
+    lod r3 r7  // get item
+    mov r1 r5  // load x and y
+    mov r2 r6
+    bge ~+4 r6 28
+        // within the furnace
+        cal .bank2_drawItemInGrid
+        cal .bank2_clearHighlight
+        ret
+    // outside the furnace
+    imm r4 1  // not selected item
+    cal .bank2_drawItem
+ret
+
+// draw arrow to show progress and items
+.bank2_drawFurnaceContents
+    // draw 3 slots in furnace
+        // fuel
+        lod r6 loadedTileEntity
+        add r6 r6 2
+        imm r1 30  // x
+        imm r2 19  // y
+        imm r5 1
+        lod r7 inventorySlot
+        sub r7 r7 0xA0
+        cal .bank2_drawGUIRow
+        // item
+        imm r1 30  // x
+        imm r2 1  // y
+        imm r5 1
+        lod r7 inventorySlot
+        sub r7 r7 0xB0
+        cal .bank2_drawGUIRow
+        // result
+        imm r1 56  // x
+        imm r2 10  // y
+        imm r5 1
+        imm r7 128
+        cal .bank2_drawGUIRow
+    
+    // draw arrow
+    out %screen_x1 42  // x
+    out %screen_y1 11  // y
+    imm r1 TEXTURE_GUI_ARROW
+    out %screen_texid_drawinvtex r1
+    out %screen_x1 50  // new x
+    add r1 r1 1
+    out %screen_texid_drawinvtex r1
+
+    // TODO: fill in based on timer value
+
+ret
+
+
+// load GUI for open furnace
+.bank2_loadFurnaceGUI
+    // draw inventory part and outline
+    cal .bank2_drawInventory
+
+    // draw furnace contents
+    cal .bank2_drawFurnaceContents
+
+    // draw smelting symbol
+    out %screen_x1 31
+    out %screen_y1 12
+    out %screen_texid_drawinvtex TEXTURE_GUI_SMELTING
+
+    // draw "INVENTORY"
+    out %screen_y1 1  // y
+    out %screen_x1 48  // FU
+    out %screen_texid_drawinvtex 0x78
+    out %screen_x1 56  // RN
+    out %screen_texid_drawinvtex 0x79
+    out %screen_x1 64  // AC
+    out %screen_texid_drawinvtex 0x7A
+    out %screen_x1 72  // E
+    out %screen_texid_drawinvtex 0x7B
+    in r0 %screen_nop  // wait for screen queue to clear
+
+    // render and wait for inputs
+    in r0 %screen_buffer
+
+.bank2_furnaceLoop
+    out %playerinput r0 //synchronize playerInput device
+
+    //handle inputs
+
+        in r0 %playerinput //get input
+
+        in r1 %playerinput //is open/close inventory pressed?
+        bnz .continueFromClosingInventory r1
+        
+    // handle inventory movement
+        in r1 %playerinput  // inventory movement
+        lod r2 inventorySlot
+        brz .bank2_furnaceSkipMovement r1  // skip if no movement
+
+        lod r7 inventorySlot
+        psh r1
+        cal .bank2_furnaceDrawSlotWithoutHighlight  // remove highlight from previous slot
+        pop r1
+
+        lod r2 inventorySlot
+        brl .bank2_furnaceMoveWithinInventory r2 0x30
+
+            // moving within furnace
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0xB0  // top of furnace
+                    imm r2 0x00  // move to bottom of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0xB0  // bottom of furnace
+                    imm r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            // note: can't move left or right within furnace GUI
+
+            jmp .bank2_furnaceSkipMovement
+
+        .bank2_furnaceMoveWithinInventory
+
+            // moving within inventory
+            bne ~+5 r1 0x10  // move up
+                brl ~+3 r2 0x20  // top of inventory
+                    imm r2 0xA0  // move to furnace
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+5 r1 0xF0  // move down
+                bge ~+3 r2 0x10  // bottom of inventory
+                    add r2 r2 0x20  // move to top of inventory
+                    jmp ~+2
+                add r2 r2 r1
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of inventory
+                    add r2 r2 0x04  // move to right of inventory
+                    jmp ~+2
+                sub r2 r2 1
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x04  // right of inventory
+                    sub r2 r2 0x04  // move to left of inventory
+                    jmp ~+2
+                add r2 r2 1
+
+        .bank2_furnaceSkipMovement
+            str inventorySlot r2  // draw selected slot
+            mov r7 r2
+            cal .bank2_furnaceDrawSlotWithHighlight
+
+            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
+            cal .bank2_furnaceDrawSlotWithHighlight
+
+            in r0 %playerinput  // garbage
+            in r1 %playerinput  // select item?
+            brz .bank2_furnaceSkipSelectItem r1  // skip if not necessary
+
+            lod r1 permanentSelectedSlot  // get current permanent slot
+            lod r2 inventorySlot
+            bne .bank2_furnaceSelectedAlready r1 0xFF  // already selected
+                // select new slot
+                bge .bank2_furnaceSkipSelectItem r2 0xA0  // out of bounds - do not select
+                str permanentSelectedSlot r2  // set new permanent slot
+                // NOTE: slot already highlighted (in previous section)
+                jmp .bank2_furnaceSkipSelectItem
+
+            .bank2_furnaceSelectedAlready
+            // slot already selected
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            lod r3 r7
+            mov r7 r2  // get memory address of new slot
+            cal .bank2_inventoryGetSlot
+            lod r4 r7
+            str r7 r3  // move item(s) over
+            psh r4  // preserve items
+            mov r7 r2
+            cal .bank2_furnaceDrawSlotWithHighlight
+            pop r4
+            lod r1 permanentSelectedSlot
+            mov r7 r1  // get memory address of old slot
+            cal .bank2_inventoryGetSlot
+            str r7 r4  // swap items the other way
+            mov r7 r1  // redraw and remove highlight
+            cal .bank2_furnaceDrawSlotWithoutHighlight
+            str permanentSelectedSlot 0xFF  // remove permanent selected slot
+            lod r7 inventorySlot  // redraw slot if needed
+            cal .bank2_furnaceDrawSlotWithHighlight
+            jmp .bank2_craftingSkipSelectItem
+        
+        .bank2_furnaceSkipSelectItem
+
+            // TODO: add furnace loop code here
+
+            in r1 %playerinput  // if nonzero, take from furnace
+            brz ~+1 r1
+
+            cal .bank2_drawFurnaceContents  // redraws furnace contents incase modified
+
+    .bank2_furnaceContinue
+    // render and wait for inputs
+    in r0 %screen_buffer
+    jmp .bank2_furnaceLoop
+
+
 
 
 
