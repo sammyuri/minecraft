@@ -1,6 +1,6 @@
 bits == 8
 minreg 7
-minheap 52
+minheap 232
 minstack 23
 
 //constants
@@ -25,7 +25,7 @@ minstack 23
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
     //other constants
-        @define BOTTOMOFSTACK 75 //in URCX: minreg + minheap. in CHUNGUS: 0
+        @define BOTTOMOFSTACK 255 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
         @define BLOCK_AIR 0x0
         @define BLOCK_grass 0x1
@@ -133,7 +133,7 @@ minstack 23
     @define y m1 //8 bits
     @define z m2 //7 bits
     @define rot m3 //8 bits
-    @define onGround m4 //1 bit //OPTIM: some of these variables (esp. bools) could probably be combined into shared bytes
+    @define onGround m4 //1 bit
     @define velY m5 //6 bits
     @define needReRender m6 //1 bit
     @define crouching m7 //1 bit
@@ -150,8 +150,12 @@ minstack 23
     @define craftingGrid m27 //NOTE: takes up 9 cells (m32-m40), 8 bits each //NOTE: these cells can be used again in portions of the code that don't interfere with crafting.
     @define craftingOutput m36 //8 bits //NOTE: this cell can be used again in portions of the code that don't interfere with crafting
     @define permanentSelectedSlot m37 //8 bits
-    @define health m38
-    @define loadedTileEntity m39
+    @define health m41
+    @define loadedTileEntity m42
+    @define newestItemEntity m43
+    @define itemEntities m44
+    @define blockEntities m116
+    @define endBlockEntities m224
 
 //initial values
     str x 0x10
@@ -165,18 +169,13 @@ minstack 23
     str prevX 0
     str prevY 0
     str prevZ 0
-    str permanentSelectedSlot 0xFF  // outside the inventory
-    str health 6 //TEMP: replace the 6 with MAXHEALTH
-
-    str loadedTileEntity m40
+    str permanentSelectedSlot 0xFF // outside the inventory
+    str health MAXHEALTH
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
 lstr inventory 3 0xE2
-
-
-jmp .bank2_loadFurnaceGUI
 
 
 .mainLoop
@@ -354,6 +353,9 @@ jmp .bank2_loadFurnaceGUI
                 lod r7 crouching
                 brl .endUseTargetedBlock r5 BLOCK_TABLE //check if targeted block is usable, if so, use it
                     //TODO: use targeted block
+                        //search through blockEntity array until match is found
+                        //set loadedBlockEntity pointer towards that block
+                        //jump to appropriate location
                 .endUseTargetedBlock
                 lod r6 inventorySlot
                 add r6 inventory r6
@@ -661,6 +663,27 @@ jmp .bank2_loadFurnaceGUI
             .endCollideWithBedrock
         
         in r0 %playerinput //is delete item pressed?
+    
+    //TODO: suffocation
+        //if player head in block:
+            //run suffocation animation
+            //go to death screen
+    
+    //TODO: update all items
+        //loop through all items
+            //if not air:
+                //apply gravity
+                //do collisions
+                //if sand and collides:
+                    //delete entity and place sand block
+                //if near player:
+                    //add to inventory
+
+    //TODO: update all furnaces
+        //loop through all block entities
+            //if furnace
+                //progress timers
+                //apply recipe
 
     //do rendering stuff
         //check if full render is necessary
@@ -711,7 +734,7 @@ jmp .bank2_loadFurnaceGUI
         
             in r0 %meshgen_renderscene
 
-            //TODO: render chests and furnace faces
+            //TODO: render chest and furnace faces
 
             //render target highlight
                 cal .rayCast
@@ -835,7 +858,7 @@ ret
 
  
 
-.drawHotbar //TODO: add rendering the selected item in your hand
+.drawHotbar
     // draw highlight (black rectangle around hotbar)
     out %screen_x1 19  // top left x
     out %screen_y1 51  // top left y
