@@ -551,7 +551,28 @@ const MeshROM = {
             ],
             quads: []
         },
-        item: {} //no item
+        item: { //stick //TODO: add to meshROM on sheets
+            textures: [
+                {
+                    id: Texture.stickItemLight,
+                    settings: 0b1100 //BTio
+                },
+                {
+                    id: Texture.stickItemDark,
+                    settings: 0b1110 //BTio
+                }
+            ],
+            quads: [
+                {id: Quad.crossItem1, texIndex: 0},
+                {id: Quad.crossItem1, texIndex: 1},
+                {id: Quad.crossItem2, texIndex: 0},
+                {id: Quad.crossItem2, texIndex: 1},
+                {id: Quad.crossItem3, texIndex: 0},
+                {id: Quad.crossItem3, texIndex: 1},
+                {id: Quad.crossItem4, texIndex: 0},
+                {id: Quad.crossItem4, texIndex: 1}
+            ]
+        }
     },
     [Block.dirt]: {
         block: { //dirt block
@@ -615,7 +636,29 @@ const MeshROM = {
             ],
             quads: []
         },
-        item: {}
+        item: { //apple //TODO: add to meshROM on sheets
+            textures: [
+                {
+                    id: Texture.appleItemLight,
+                    settings: 0b1100 //BTio
+                },
+                {
+                    id: Texture.appleItemDark,
+                    settings: 0b1110 //BTio
+                }
+            ],
+            quads: [
+                {id: Quad.crossItem1, texIndex: 0},
+                {id: Quad.crossItem1, texIndex: 1},
+                {id: Quad.crossItem2, texIndex: 0},
+                {id: Quad.crossItem2, texIndex: 1},
+                {id: Quad.crossItem3, texIndex: 0},
+                {id: Quad.crossItem3, texIndex: 1},
+                {id: Quad.crossItem4, texIndex: 0},
+                {id: Quad.crossItem4, texIndex: 1}
+            ]
+        }
+
     },
     [Block.cobble]: {
         block: {
