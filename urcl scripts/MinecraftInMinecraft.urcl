@@ -10,6 +10,10 @@ minstack 23
         @define PLAYERHEIGHT 28 //technically it's 29, but 28 makes calculations easier
         @define PLAYERHALFWIDTH 5
         @define PLAYERCAMHEIGHT 24
+        @define PICKUPDOWN -8
+        @define PICKUPUP 37
+        @define PICKUPNEGSIDE -16
+        @define PICKUPPOSSIDE 26
         @define PLAYERCROUCHCAMHEIGHT 22
         @define MIDDLEOFVOID 0b1010_0000
         @define BLOCKMIDDLEOFVOID 0b1100
@@ -78,6 +82,10 @@ minstack 23
         @define ITEM_FURNACE 0xFE
         @define ITEM_CHEST 0xFF
     //entity IDs
+        //NOTE: item entities have the following structure in RAM:
+            //byte 1: IIII_VVVV; I=id, V=y-velocity
+            //byte 2: XXX.X_ZZZ.Z
+            //byte 3: 0YYY.YYYY
         @define ENTITY_STICK 0x1
         @define ENTITY_DIRT 0x2
         @define ENTITY_APPLE 0x3
@@ -104,10 +112,10 @@ minstack 23
         @define TEXTURE_CRAFT 0x75
         @define TEXTURE_FURNACE 0x78
         @define TEXTURE_CHEST 0x7C
-        @define TEXTURE_HIGHLIGHT0 0x19
-        @define TEXTURE_HIGHLIGHT7 0x20
-        @define TEXTURE_HEARTEMPTY 0xfe
-        @define TEXTURE_HEARTFULL 0xff
+        @define TEXTURE_HIGHLIGHT0 128
+        @define TEXTURE_HIGHLIGHT7 135
+        @define TEXTURE_HEARTEMPTY 136
+        @define TEXTURE_HEARTFULL 137
     //other
         @define TOOL_PICKAXE 0
         @define TOOL_AXE 1
@@ -171,6 +179,7 @@ minstack 23
     str prevZ 0
     str permanentSelectedSlot 0xFF // outside the inventory
     str health MAXHEALTH
+    str newestItemEntity health //initialize to 3 cells before the start of the array, which happens to be where health is located.
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
@@ -319,7 +328,7 @@ lstr inventory 3 0xE2
                         cal .createEntity
                         jmp .endDropItem
                     .breakLeavesDropItem
-                        bre ~+3 r7 STRENGTH_IRON //if using shears, drop leaves item
+                        bne ~+3 r7 STRENGTH_IRON //if using shears, drop leaves item
                             //r5 is already leaves entity ID
                             cal .createEntity
                             jmp .endDropItem
@@ -746,7 +755,26 @@ lstr inventory 3 0xE2
                     in r0 %amogus_drawquad
                     imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
 
-            //TODO: render item entities
+            //render item entities
+                imm r1 itemEntities
+                .renderItemEntitiesLoop
+                    lod r2 r1
+                    brz .renderItemEntitiesNext r2
+                        and r2 r2 0x0f
+                        out %meshgen_itemid r2
+
+                        add r2 r1 1
+                        lod r2 r2
+                        out %meshgen_itemxz r2
+
+                        add r2 r1 2
+                        lod r2 r2
+                        out %meshgen_itemy r2
+                        in r0 %meshgen_renderitem
+                    .renderItemEntitiesNext
+                    add r1 r1 3
+                brl .renderItemEntitiesLoop r1 blockEntities
+
 
             in r0 %amogus_drawtoscreen
             imm r1 @max //TEMP: this simulates the lag from drawing the entire screen in-game
@@ -763,25 +791,40 @@ jmp .mainLoop
 
 .gameOver
     in r0 %screen_clearscreen
-    //TODO: draw game over message to screen
+    //TODO: draw 'game over' message to screen
     in r0 %screen_buffer
 hlt
 
 //createEntity function: creates a new item entity based on a location and an entity ID
     //inputs:
-        //r3: X, Z block position of entity //NOTE: must be preserved
-        //r4: Y block position of entity //NOTE: must be preserved
+        //r3: X, Z block position of entity //NOTE: preserved
+        //r4: Y block position of entity //NOTE: preserved
         //r5: ID of entity
     //outputs:
         //none
+    //NOTE: entity format is as follows:
+        //byte 1: VVVV_IIII; V=y-velocity, I=id
+        //byte 2: XXX.X_ZZZ.Z
+        //byte 3: 0YYY.YYYY
 .createEntity
-    //TODO: create entity
-    out %hex r3
-    out %text ' '
-    out %int r4
-    out %text ' '
-    out %int r5
-    out %text '\n'
+    lod r1 newestItemEntity
+    add r1 r1 3
+    brl ~+2 r1 blockEntities
+        imm r1 itemEntities
+    str newestItemEntity r1
+    str r1 r5
+    inc r1 r1
+    lsh r2 r3
+    in r5 %rng
+    and r5 r5 0x11
+    or r2 r2 r5
+    str r1 r2
+    inc r1 r1
+    bsl r2 r4 4
+    in r5 %rng
+    and r5 r5 0x07
+    or r2 r2 r5
+    str r1 r2
 ret
 
 //getBlockType function: returns the type of block based on a block ID

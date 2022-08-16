@@ -4,7 +4,7 @@ from json import dumps
 
 def resetdata():
     with open("data.txt", "w") as f:
-        f.write("0" * 128 * 8 * 8)
+        f.write("0" * 256 * 8 * 8)
 
 def getdata():
     with open("data.txt", "r") as f:

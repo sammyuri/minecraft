@@ -91,7 +91,7 @@ export class MeshGen implements Device {
             ];
             const TexIndices = [ 1, 0, 2, 2, 3, 2 ];
             for (let i = 0; i < 6; i++) {
-                let texture = item.textures[i];
+                let texture = item.textures[TexIndices[i]];
                 this.RenderQuad(x, y, z, ItemQuads[i], texture.id, texture.settings);
             }
         } else {
@@ -282,6 +282,8 @@ export class MeshGen implements Device {
         switch (itemId) {
             case Item.coal:
             case Item.sapling:
+            case Item.stick:
+            case Item.apple:
                 return false;
         }
         return true;
@@ -289,7 +291,9 @@ export class MeshGen implements Device {
 }
 
 enum Item {
+    stick = 0x1,
     dirt = 0x2,
+    apple = 0x3,
     cobble = 0x4,
     log = 0x5,
     leaves = 0x6,

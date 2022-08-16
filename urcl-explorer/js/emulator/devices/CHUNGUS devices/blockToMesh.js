@@ -84,7 +84,7 @@ export class MeshGen {
             ];
             const TexIndices = [1, 0, 2, 2, 3, 2];
             for (let i = 0; i < 6; i++) {
-                let texture = item.textures[i];
+                let texture = item.textures[TexIndices[i]];
                 this.RenderQuad(x, y, z, ItemQuads[i], texture.id, texture.settings);
             }
         }
@@ -259,6 +259,8 @@ export class MeshGen {
         switch (itemId) {
             case Item.coal:
             case Item.sapling:
+            case Item.stick:
+            case Item.apple:
                 return false;
         }
         return true;
@@ -266,7 +268,9 @@ export class MeshGen {
 }
 var Item;
 (function (Item) {
+    Item[Item["stick"] = 1] = "stick";
     Item[Item["dirt"] = 2] = "dirt";
+    Item[Item["apple"] = 3] = "apple";
     Item[Item["cobble"] = 4] = "cobble";
     Item[Item["log"] = 5] = "log";
     Item[Item["leaves"] = 6] = "leaves";
