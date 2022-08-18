@@ -699,6 +699,7 @@ lstr inventory 3 0xE2
         .updateItemEntitiesLoop //loop through all items
             lod r2 r1
             brz .updateItemEntitiesNext r2
+                
                 //if near player and is not falling sand:
                     and r3 r2 0x0f
                     bre .endPickUpItem r3 ENTITY_FALLINGSAND
@@ -707,18 +708,8 @@ lstr inventory 3 0xE2
                     lod r3 r3
                     and r4 r3 0xF0
                     rsh r4 r4 //r4 = item x pos
-                    // out %text 'i'
-                    // out %text 'x'
-                    // out %text ':'
-                    // out %int r4
-                    // out %text ' '
                     
                     lod r5 x
-                    // out %text 'p'
-                    // out %text 'x'
-                    // out %text ':'
-                    // out %int r5
-                    // out %text '\n'
                     sub r6 r5 PICKUPSIDENEG //r6 = min item x pos for pickup
                     ble ~+2 r6 MIDDLEOFVOID
                         imm r6 0
@@ -729,18 +720,8 @@ lstr inventory 3 0xE2
 
                     and r4 r3 0x0F
                     bsl r4 r4 3 //r4 = item z pos
-                    // out %text 'i'
-                    // out %text 'z'
-                    // out %text ':'
-                    // out %int r4
-                    // out %text ' '
 
                     lod r5 z
-                    // out %text 'p'
-                    // out %text 'z'
-                    // out %text ':'
-                    // out %int r5
-                    // out %text '\n'
                     sub r6 r5 PICKUPSIDENEG //r6 = min item z pos for pickup
                     ble ~+2 r6 MIDDLEOFVOID
                         imm r6 0
@@ -761,33 +742,98 @@ lstr inventory 3 0xE2
                     add r6 r5 PICKUPSIDEPOS //r6 = max item y pos for pickup
                     brg .endPickUpItem r4 r6
 
-                    psh r1 //preserve r1 through function call
-                        //convert item entity to inventory item and store in r7
-                            and r3 r2 0x0F //r3 = entity id
-                            bne ~+3 r3 ENTITY_APPLE
-                                imm r7 0xE1
-                                jmp .endConvertEntityToItem
-                            bne ~+3 r3 ENTITY_TABLE
-                                imm r7 ITEM_TABLE
-                                jmp .endConvertEntityToItem
-                            bne ~+3 r3 ENTITY_FURNACE
-                                imm r7 ITEM_FURNACE
-                                jmp .endConvertEntityToItem
-                            bne ~+3 r3 ENTITY_CHEST
-                                imm r7 ITEM_CHEST 
-                                jmp .endConvertEntityToItem
+                    //convert item entity to inventory item and store in r7 for function call
+                        and r3 r2 0x0F //r3 = entity id
+                        bne ~+3 r3 ENTITY_APPLE
+                            imm r7 0xE1
+                            jmp .endConvertEntityToItem
+                        bne ~+3 r3 ENTITY_TABLE
+                            imm r7 ITEM_TABLE
+                            jmp .endConvertEntityToItem
+                        bne ~+3 r3 ENTITY_FURNACE
+                            imm r7 ITEM_FURNACE
+                            jmp .endConvertEntityToItem
+                        bne ~+3 r3 ENTITY_CHEST
+                            imm r7 ITEM_CHEST 
+                            jmp .endConvertEntityToItem
+                        //entity item has same ID as inventory item:
                             bsl r7 r3 4
                             inc r7 r7
-                        .endConvertEntityToItem
+                    .endConvertEntityToItem
+                    psh r1 //preserve r1 through function call
                         cal .bank1_addItemToInventory
                     pop r1
-                    str r1 0
+                    str r1 0 //delete item entity
                 .endPickUpItem
                 //TODO: apply gravity
-                //do collisions
-                //if sand and collides:
-                    //delete entity and place sand block
-                
+                    lod r2 r1
+                    bge ~+2 r2 0xF0
+                        addv r2 r2 0x10
+                    str r1 r2
+
+                    and r2 r2 0xF0
+                    add r3 r1 2
+                    lod r3 r3 
+                    sub r6 r3 r2
+                    bge ~+2 r6 MIDDLEOFVOID
+                        imm r6 0
+                    
+                    bsr r3 r3 4 //r3 = start pos
+                    bsr r4 r6 4 //r4 = end pos
+                    
+                    inc r2 r1
+                    lod r2 r2
+                    bsr r5 r2 5
+                    out %blockram_x r5
+
+                    and r5 r2 0x0F
+                    rsh r5 r5
+                    out %blockram_z r5
+
+                    .itemEntityCollisionLoop1
+                        out %blockram_y r3
+                        in r2 %blockram_id
+                        bge .itemEntityResolveCollisionLoop r3 BLOCKMIDDLEOFVOID
+                        brz .itemEntityCollisionLoop1Next r2
+                        bre .itemEntityCollisionLoop1Next r2 BLOCK_SAPLING
+                        .itemEntityResolveCollisionLoop
+                            inc r3 r3
+                            out %blockram_y r3
+                            in r5 %blockram_id
+                            bge .itemEntityResolveCollision r3 8
+                            brz .itemEntityResolveCollision r5
+                            bne .itemEntityResolveCollisionLoop r5 BLOCK_SAPLING
+                            .itemEntityResolveCollision
+                                lod r2 r1
+                                and r4 r2 0x0F
+                                bne .itemEntityResolveCollisionNotFallingSand r4 ENTITY_FALLINGSAND
+                                    bne .convertFallingSandToBlock r5 BLOCK_SAPLING
+                                        dec r2 r2 //convert falling sand entity into sand entity
+                                        str r1 r2
+                                        inc r2 r1
+                                        lod r4 r2 //randomize x and z position of entity
+                                        in r5 %rng
+                                        and r5 r5 0x11
+                                        or r4 r4 r5
+                                        str r2 r4
+                                        jmp .itemEntityResolveCollisionNotFallingSand
+                                    .convertFallingSandToBlock
+                                        out %blockram_id BLOCK_SAND
+                                        str r1 0
+                                        jmp .updateItemEntitiesNext
+                                .itemEntityResolveCollisionNotFallingSand
+                                bsl r3 r3 4
+                                add r2 r1 2
+                                str r2 r3
+                                lod r2 r1
+                                and r2 r2 0x0F //reset velocity of item after collision
+                                str r1 r2
+                                jmp .updateItemEntitiesNext
+                        .itemEntityCollisionLoop1Next
+                        dec r3 r3
+                    bge .itemEntityCollisionLoop1 r3 r4
+                    add r2 r1 2
+                    str r2 r6
             .updateItemEntitiesNext
             add r1 r1 3
         brl .updateItemEntitiesLoop r1 blockEntities
@@ -821,6 +867,7 @@ lstr inventory 3 0xE2
             
         //if full render not necessary:
             imm r1 50 //TEMP: this simulates a faster frame when you don't need to simulate the entire sccene.
+            cal .drawEnties //always draw entities
         jmp .renderUI
 
         .doFullRender
@@ -858,27 +905,8 @@ lstr inventory 3 0xE2
                     out %amogus_tex TEXTURE_HIGHLIGHT0
                     in r0 %amogus_drawquad
                     imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
-
-            //render item entities
-                imm r1 itemEntities
-                .renderItemEntitiesLoop
-                    lod r2 r1
-                    brz .renderItemEntitiesNext r2
-                        and r2 r2 0x0f
-                        out %meshgen_itemid r2
-
-                        add r2 r1 1
-                        lod r2 r2
-                        out %meshgen_itemxz r2
-
-                        add r2 r1 2
-                        lod r2 r2
-                        out %meshgen_itemy r2
-                        in r0 %meshgen_renderitem
-                    .renderItemEntitiesNext
-                    add r1 r1 3
-                brl .renderItemEntitiesLoop r1 blockEntities
-
+            
+            cal .drawEnties
 
             in r0 %amogus_drawtoscreen
             imm r1 @max //TEMP: this simulates the lag from drawing the entire screen in-game
@@ -1045,6 +1073,28 @@ ret
     ble .drawFullHeartsLoop r2 r3
 
 ret
+
+.drawEnties
+    imm r1 itemEntities
+    .renderItemEntitiesLoop
+        lod r2 r1
+        brz .renderItemEntitiesNext r2
+            and r2 r2 0x0f
+            out %meshgen_itemid r2
+
+            add r2 r1 1
+            lod r2 r2
+            out %meshgen_itemxz r2
+
+            add r2 r1 2
+            lod r2 r2
+            out %meshgen_itemy r2
+            in r0 %meshgen_renderitem
+        .renderItemEntitiesNext
+        add r1 r1 3
+    brl .renderItemEntitiesLoop r1 blockEntities
+ret
+
 
 //rayCast function //OPTIM: there is still a lot of room for optimization in this section of code. Most of it can probably be reused instead of repeated.
     //description:
