@@ -376,7 +376,7 @@ lstr inventory 3 0xE2
                     //TODO: use targeted block
                         //search through blockEntity array until match is found
                         //set loadedBlockEntity pointer towards that block
-                        //jump to appropriate location
+                        //jump to appropriate location in bank2
                 .endUseTargetedBlock
                 lod r6 inventorySlot
                 add r6 inventory r6
@@ -487,7 +487,7 @@ lstr inventory 3 0xE2
                 str crouching r1
                 str needReRender r1
 
-        //handle rotation inputs
+        //handle rotation inputs //TODO: add a limit on camera pitch
             in r1 %playerinput //rotation
             brz ~+5 r1
                 lod r2 rot
@@ -690,7 +690,7 @@ lstr inventory 3 0xE2
             //run suffocation animation
             //go to death screen
     
-    //TODO: update all items
+    //update all items
         //NOTE: entity format is as follows:
             //byte 1: VVVV_IIII; V=y-velocity, I=id
             //byte 2: XXX.X_ZZZ.Z
@@ -765,7 +765,7 @@ lstr inventory 3 0xE2
                     pop r1
                     str r1 0 //delete item entity
                 .endPickUpItem
-                //TODO: apply gravity
+                //apply gravity
                     lod r2 r1
                     bge ~+2 r2 0xF0
                         addv r2 r2 0x10
@@ -924,6 +924,7 @@ jmp .mainLoop
 .gameOver
     in r0 %screen_clearscreen
     //TODO: draw 'game over' message to screen
+    //TODO: respawning
     in r0 %screen_buffer
 hlt
 
