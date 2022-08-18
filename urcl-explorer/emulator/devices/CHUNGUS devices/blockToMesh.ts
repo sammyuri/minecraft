@@ -284,6 +284,7 @@ export class MeshGen implements Device {
             case Item.sapling:
             case Item.stick:
             case Item.apple:
+            case Item.fallingSand:
                 return false;
         }
         return true;
@@ -301,6 +302,7 @@ enum Item {
     coal = 0x8,
     ironOre = 0x9,
     sand = 0xA,
+    fallingSand = 0xB,
     sapling = 0xC,
     table = 0xD,
     furnace = 0xE,
@@ -987,7 +989,23 @@ const MeshROM = {
             ],
             quads: []
         },
-        item: {}
+        item: { //falling sand
+            textures: [
+                {
+                    id: Texture.dirt,
+                    settings: 0b1010
+                }
+            ],
+            quads: [
+                { id: Quad.fullBlockNegX, texIndex: 0 },
+                { id: Quad.fullBlockPosY, texIndex: 0 },
+                { id: Quad.fullBlockNegZ, texIndex: 0 },
+                { id: Quad.fullBlockPosX, texIndex: 0 },
+                { id: Quad.fullBlockNegY, texIndex: 0 },
+                { id: Quad.fullBlockPosZ, texIndex: 0 },
+                { id: 0x1F, texIndex: 0}
+            ]
+        }
     },
     [Block.sapling]: {
         block: {

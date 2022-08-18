@@ -261,6 +261,7 @@ export class MeshGen {
             case Item.sapling:
             case Item.stick:
             case Item.apple:
+            case Item.fallingSand:
                 return false;
         }
         return true;
@@ -278,6 +279,7 @@ var Item;
     Item[Item["coal"] = 8] = "coal";
     Item[Item["ironOre"] = 9] = "ironOre";
     Item[Item["sand"] = 10] = "sand";
+    Item[Item["fallingSand"] = 11] = "fallingSand";
     Item[Item["sapling"] = 12] = "sapling";
     Item[Item["table"] = 13] = "table";
     Item[Item["furnace"] = 14] = "furnace";
@@ -949,7 +951,23 @@ const MeshROM = {
             ],
             quads: []
         },
-        item: {}
+        item: {
+            textures: [
+                {
+                    id: Texture.dirt,
+                    settings: 0b1010
+                }
+            ],
+            quads: [
+                { id: Quad.fullBlockNegX, texIndex: 0 },
+                { id: Quad.fullBlockPosY, texIndex: 0 },
+                { id: Quad.fullBlockNegZ, texIndex: 0 },
+                { id: Quad.fullBlockPosX, texIndex: 0 },
+                { id: Quad.fullBlockNegY, texIndex: 0 },
+                { id: Quad.fullBlockPosZ, texIndex: 0 },
+                { id: 0x1F, texIndex: 0 }
+            ]
+        }
     },
     [Block.sapling]: {
         block: {

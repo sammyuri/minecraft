@@ -10,10 +10,10 @@ minstack 23
         @define PLAYERHEIGHT 28 //technically it's 29, but 28 makes calculations easier
         @define PLAYERHALFWIDTH 5
         @define PLAYERCAMHEIGHT 24
-        @define PICKUPDOWN -8
+        @define PICKUPDOWN 12
         @define PICKUPUP 37
-        @define PICKUPNEGSIDE -16
-        @define PICKUPPOSSIDE 26
+        @define PICKUPSIDENEG 22
+        @define PICKUPSIDEPOS 28
         @define PLAYERCROUCHCAMHEIGHT 22
         @define MIDDLEOFVOID 0b1010_0000
         @define BLOCKMIDDLEOFVOID 0b1100
@@ -352,7 +352,19 @@ lstr inventory 3 0xE2
                 out %blockram_z r7
                 out %blockram_y r4
                 out %blockram_id 0 //replace targeted block with air
-                //TODO: check if block above this block is sand, if so, make it fall
+                //check if block above this block is sand or sapling, if so, make it fall
+                .FallingSandLoop
+                    inc r4 r4
+                    out %blockram_y r4
+                    in r5 %blockram_id
+                    bne ~+5 r5 BLOCK_SAND
+                        imm r5 ENTITY_FALLINGSAND
+                        cal .createEntity
+                        out %blockram_id 0
+                        jmp .FallingSandLoop
+                    bne ~+3 r5 BLOCK_SAPLING
+                        cal .createEntity
+                        jmp .FallingSandLoop
                 str needReRender @max
                 in r0 %playerinput //keep playerInput device synced
                 jmp .endBreakAndPlace
@@ -679,14 +691,106 @@ lstr inventory 3 0xE2
             //go to death screen
     
     //TODO: update all items
-        //loop through all items
-            //if not air:
-                //apply gravity
+        //NOTE: entity format is as follows:
+            //byte 1: VVVV_IIII; V=y-velocity, I=id
+            //byte 2: XXX.X_ZZZ.Z
+            //byte 3: 0YYY.YYYY
+        imm r1 itemEntities
+        .updateItemEntitiesLoop //loop through all items
+            lod r2 r1
+            brz .updateItemEntitiesNext r2
+                //if near player and is not falling sand:
+                    and r3 r2 0x0f
+                    bre .endPickUpItem r3 ENTITY_FALLINGSAND
+
+                    inc r3 r1
+                    lod r3 r3
+                    and r4 r3 0xF0
+                    rsh r4 r4 //r4 = item x pos
+                    // out %text 'i'
+                    // out %text 'x'
+                    // out %text ':'
+                    // out %int r4
+                    // out %text ' '
+                    
+                    lod r5 x
+                    // out %text 'p'
+                    // out %text 'x'
+                    // out %text ':'
+                    // out %int r5
+                    // out %text '\n'
+                    sub r6 r5 PICKUPSIDENEG //r6 = min item x pos for pickup
+                    ble ~+2 r6 MIDDLEOFVOID
+                        imm r6 0
+                    brl .endPickUpItem r4 r6
+
+                    add r6 r5 PICKUPSIDEPOS //r6 = max item x pos for pickup
+                    brg .endPickUpItem r4 r6
+
+                    and r4 r3 0x0F
+                    bsl r4 r4 3 //r4 = item z pos
+                    // out %text 'i'
+                    // out %text 'z'
+                    // out %text ':'
+                    // out %int r4
+                    // out %text ' '
+
+                    lod r5 z
+                    // out %text 'p'
+                    // out %text 'z'
+                    // out %text ':'
+                    // out %int r5
+                    // out %text '\n'
+                    sub r6 r5 PICKUPSIDENEG //r6 = min item z pos for pickup
+                    ble ~+2 r6 MIDDLEOFVOID
+                        imm r6 0
+                    brl .endPickUpItem r4 r6
+
+                    add r6 r5 PICKUPSIDEPOS //r6 = max item z pos for pickup
+                    brg .endPickUpItem r4 r6
+
+                    add r3 r1 2
+                    lod r4 r3 //r4 = item y pos
+
+                    lod r5 y
+                    sub r6 r5 PICKUPDOWN //r6 = min item y pos for pickup
+                    ble ~+2 r6 MIDDLEOFVOID
+                        imm r6 0
+                    brl .endPickUpItem r4 r6
+
+                    add r6 r5 PICKUPSIDEPOS //r6 = max item y pos for pickup
+                    brg .endPickUpItem r4 r6
+
+                    psh r1 //preserve r1 through function call
+                        //convert item entity to inventory item and store in r7
+                            and r3 r2 0x0F //r3 = entity id
+                            bne ~+3 r3 ENTITY_APPLE
+                                imm r7 0xE1
+                                jmp .endConvertEntityToItem
+                            bne ~+3 r3 ENTITY_TABLE
+                                imm r7 ITEM_TABLE
+                                jmp .endConvertEntityToItem
+                            bne ~+3 r3 ENTITY_FURNACE
+                                imm r7 ITEM_FURNACE
+                                jmp .endConvertEntityToItem
+                            bne ~+3 r3 ENTITY_CHEST
+                                imm r7 ITEM_CHEST 
+                                jmp .endConvertEntityToItem
+                            bsl r7 r3 4
+                            inc r7 r7
+                        .endConvertEntityToItem
+                        cal .bank1_addItemToInventory
+                    pop r1
+                    str r1 0
+                .endPickUpItem
+                //TODO: apply gravity
                 //do collisions
                 //if sand and collides:
                     //delete entity and place sand block
-                //if near player:
-                    //add to inventory
+                
+            .updateItemEntitiesNext
+            add r1 r1 3
+        brl .updateItemEntitiesLoop r1 blockEntities
 
     //TODO: update all furnaces
         //loop through all block entities
@@ -815,15 +919,18 @@ hlt
     str r1 r5
     inc r1 r1
     lsh r2 r3
-    in r5 %rng
-    and r5 r5 0x11
-    or r2 r2 r5
+    bne ~+3 r5 ENTITY_FALLINGSAND
+        imm r5 0 //if entity is falling sand, don't randomize position.
+    jmp ~+2
+        in r5 %rng
+    and r6 r5 0x11
+    or r2 r2 r6
     str r1 r2
     inc r1 r1
     bsl r2 r4 4
-    in r5 %rng
-    and r5 r5 0x07
-    or r2 r2 r5
+    rsh r5 r5
+    and r6 r5 0x07
+    or r2 r2 r6
     str r1 r2
 ret
 
@@ -931,12 +1038,11 @@ ret
     imm r2 1
     lod r3 health
     .drawFullHeartsLoop
-        brl ~+6 r3 r2
         out %screen_x1 r1
         out %screen_texid_drawtex TEXTURE_HEARTFULL
         add r1 r1 6
         inc r2 r2
-    ble .drawFullHeartsLoop r1 61
+    ble .drawFullHeartsLoop r2 r3
 
 ret
 
@@ -1439,6 +1545,63 @@ ret
         bnz .drawGUIRowLoop r5 // loop if not done yet
     ret  // return
 // end drawGUIRow function
+
+.bank1_addItemToInventory
+    // input: r7 (item)
+    // other registers not necessarily preserved
+    imm r1 0
+    and r6 r7 0xF0  // item id
+    bre .bank1_skipStackLoop r6 0xF0  // skip if nonstackable
+    .bank1_addItemToInventoryStackLoop
+        add r1 r1 inventory  // check what item is already there
+        lod r2 r1
+        and r3 r2 0xF0
+        bne .bank1_addItemToInventoryStackLoopContinue r3 r6  // ensure same item ID
+            and r4 r2 0x0F  // get item counts
+            and r5 r7 0x0F
+            add r5 r4 r5  // get sum
+            bge .bank1_addItemToInventoryStackStackTooBig r5 16  // skip if stack too big
+                add r3 r3 r5
+                str r1 r3  // store new, bigger stack
+                ret  // done
+            .bank1_addItemToInventoryStackStackTooBig
+            or r2 r2 15
+            str r1 r2  // store max size stack
+            sub r5 r5 15  // remaining items
+            add r7 r6 r5  // new item id
+        .bank1_addItemToInventoryStackLoopContinue
+        sub r1 r1 inventory
+        add r1 r1 1  // continue and check if done
+    brl .bank1_addItemToInventoryStackLoop r1 15
+        
+    .bank1_skipStackLoop
+    imm r1 0
+    .bank1_addItemToInventoryLoop
+        add r1 r1 inventory  // check what item is already there
+        lod r2 r1
+        bnz ~+3 r2  // no item
+            str r1 r7  // store regardless of what it is
+            ret  // done
+        bge .bank1_addItemToInventoryLoopContinue r7 0xF0  // skip if nonstackable
+        and r3 r2 0xF0  // get item id
+        bne .bank1_addItemToInventoryLoopContinue r6 r3  // skip if not same item id
+            and r4 r2 0x0F  // get item counts
+            and r5 r7 0x0F
+            add r5 r4 r5  // get sum
+            bge .bank1_addItemToInventoryStackTooBig r5 16  // skip if stack too big
+                add r3 r3 r5
+                str r1 r3  // store new, bigger stack
+                ret  // done
+            .bank1_addItemToInventoryStackTooBig
+            or r2 r2 15
+            str r1 r2  // store max size stack
+            sub r5 r5 15  // remaining items
+            add r7 r6 r5  // new item id
+        .bank1_addItemToInventoryLoopContinue
+        sub r1 r1 inventory
+        add r1 r1 1  // continue and check if done
+    brl .bank1_addItemToInventoryLoop r1 15
+ret
 
 
 
@@ -2936,5 +3099,3 @@ ret
     // render and wait for inputs
     in r0 %screen_buffer
     jmp .bank2_chestLoop
-
-
