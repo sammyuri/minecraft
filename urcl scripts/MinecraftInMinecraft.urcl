@@ -116,6 +116,7 @@ minstack 23
         @define TEXTURE_HIGHLIGHT7 135
         @define TEXTURE_HEARTEMPTY 136
         @define TEXTURE_HEARTFULL 137
+        @define TEXTURE_GAMEOVER 0x90
     //other
         @define TOOL_PICKAXE 0
         @define TOOL_AXE 1
@@ -353,7 +354,7 @@ lstr inventory 3 0xE2
                 out %blockram_y r4
                 out %blockram_id 0 //replace targeted block with air
                 //check if block above this block is sand or sapling, if so, make it fall
-                .FallingSandLoop
+                .fallingSandLoop
                     inc r4 r4
                     out %blockram_y r4
                     in r5 %blockram_id
@@ -361,10 +362,10 @@ lstr inventory 3 0xE2
                         imm r5 ENTITY_FALLINGSAND
                         cal .createEntity
                         out %blockram_id 0
-                        jmp .FallingSandLoop
+                        jmp .fallingSandLoop
                     bne ~+3 r5 BLOCK_SAPLING
                         cal .createEntity
-                        jmp .FallingSandLoop
+                        jmp .fallingSandLoop
                 str needReRender @max
                 in r0 %playerinput //keep playerInput device synced
                 jmp .endBreakAndPlace
@@ -739,7 +740,7 @@ lstr inventory 3 0xE2
                         imm r6 0
                     brl .endPickUpItem r4 r6
 
-                    add r6 r5 PICKUPSIDEPOS //r6 = max item y pos for pickup
+                    add r6 r5 PICKUPUP //r6 = max item y pos for pickup
                     brg .endPickUpItem r4 r6
 
                     //convert item entity to inventory item and store in r7 for function call
@@ -923,7 +924,49 @@ jmp .mainLoop
 
 .gameOver
     in r0 %screen_clearscreen
-    //TODO: draw 'game over' message to screen
+    
+    imm r1 TEXTURE_GAMEOVER
+
+    // You died!
+        out %screen_y1 11
+        imm r2 27
+            out %screen_x1 r2
+            out %screen_texid_drawtex r1
+            add r1 r1 1
+            add r2 r2 8
+            ble ~-4 r2 67
+        in r0 %screen_nop
+
+    // Score: 69
+        out %screen_y1 22
+        imm r2 33
+            out %screen_x1 r2
+            out %screen_texid_drawtex r1
+            add r1 r1 1
+            add r2 r2 8
+            ble ~-4 r2 57
+        in r0 %screen_nop
+
+    // Respawn button
+        out %screen_x1 12
+        out %screen_y1 34
+        out %screen_x2 83
+        out %screen_y2_drawrect 46
+        out %screen_x1 13
+        out %screen_y1 35
+        out %screen_x2 82
+        out %screen_y2_clearrect 45
+        in r0 %screen_nop
+
+    // Respawn
+        out %screen_y1 37
+        imm r2 31
+            out %screen_x1 r2
+            out %screen_texid_drawtex r1
+            add r1 r1 1
+            add r2 r2 8
+            ble ~-4 r2 63
+
     //TODO: respawning
     in r0 %screen_buffer
 hlt
