@@ -186,6 +186,7 @@ lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
 lstr inventory 3 0xE2
+lstr inventory 4 0xFD
 
 
 .mainLoop
@@ -311,7 +312,7 @@ lstr inventory 3 0xE2
                         pop r2
                         //NOTE: if r1 gets used above, pop it from the stack here
                         in r0 %screen_buffer
-                    ble .blockBreakAnimLoop r6 TEXTURE_HIGHLIGHT7
+                    brl .blockBreakAnimLoop r6 TEXTURE_HIGHLIGHT7  // if using less or equal, will draw an extra texture
                     imm sp BOTTOMOFSTACK //refresh stack after using .getRayCastTargetQuad
                 .endBlockBreakAnim
                     brl .endDropItem r7 STRENGTHFORITEM //if break strength is insufficient don't drop an item
@@ -374,7 +375,8 @@ lstr inventory 3 0xE2
             brz .endBreakAndPlace r7
                 lod r7 crouching
                 brl .endUseTargetedBlock r5 BLOCK_TABLE //check if targeted block is usable, if so, use it
-                    //TODO: use targeted block
+                    bre .bank2_loadCraftingGUI r5 BLOCK_TABLE  // crafting
+                    //TODO: use targeted block if tile entity
                         //search through blockEntity array until match is found
                         //set loadedBlockEntity pointer towards that block
                         //jump to appropriate location in bank2
@@ -486,13 +488,25 @@ lstr inventory 3 0xE2
             lod r2 crouching
             bre ~+3 r1 r2 //if crouching status changed:
                 str crouching r1
-                str needReRender r1
+                str needReRender @max
 
-        //handle rotation inputs //TODO: add a limit on camera pitch
+        //handle rotation inputs
             in r1 %playerinput //rotation
-            brz ~+5 r1
-                lod r2 rot
-                addv r2 r1 r2
+            brz ~+14 r1
+
+                lod r2 rot  // yaw
+                and r3 r1 0x0F
+                addv r2 r3 r2
+
+                sub r3 r1 r3  // pitch
+                and r4 r2 0xF0
+                bne ~+3 r3 0x10  // look up
+                    bre ~+2 r4 0x40  // don't go past vertical
+                        addv r2 r3 r2
+                bne ~+3 r3 0xF0  // look down
+                    bre ~+2 r4 0xC0  // don't go past vertical
+                        addv r2 r3 r2
+
                 str rot r2
                 str needReRender r1
 
@@ -686,10 +700,7 @@ lstr inventory 3 0xE2
         
         in r0 %playerinput //is delete item pressed?
     
-    //TODO: suffocation
-        //if player head in block:
-            //run suffocation animation
-            //go to death screen
+    cal .checkSuffocation
     
     //update all items
         //NOTE: entity format is as follows:
@@ -921,6 +932,79 @@ lstr inventory 3 0xE2
         in r0 %screen_buffer
         str needReRender 0
 jmp .mainLoop
+
+.checkSuffocation
+    //if player head in block:
+    lod r1 x
+    add r1 r1 PLAYERHALFWIDTH  // check the block at middle of head
+    bsr r1 r1 4
+    out %blockram_x r1
+    lod r2 z
+    add r2 r2 PLAYERHALFWIDTH  // check the block at middle of head
+    bsr r2 r2 4
+    out %blockram_z r2
+    lod r3 y
+    add r3 r3 PLAYERCAMHEIGHT  // check the block at cam height
+    bsr r3 r3 4
+    out %blockram_y r3
+    in r4 %blockram_id
+    bre .dontSuffocate r4 BLOCK_AIR  // hitbox-less blocks
+    bre .dontSuffocate r4 BLOCK_SAPLING
+    bre .dontSuffocate r4 BLOCK_GLASS  // these also don't suffocate in normal MC
+    bre .dontSuffocate r4 BLOCK_LEAVES
+
+    // make block face takes up entire screen (-1 z)
+        // delete block
+            add r2 r2 -1
+            out %blockram_z r2
+            in r4 %blockram_id  // preserve old block
+            psh r4
+            out %blockram_id 0
+
+        // render
+            in r0 %amogus_clearbuffer
+
+            out %amogus_camrot 0  // face straight forwards
+
+            bsl r1 r1 4
+            add r1 r1 8  // adjust to centre of block
+            out %amogus_camx r1
+
+            bsl r2 r2 4
+            add r2 r2 7  // far enough to fill whole screen
+            out %amogus_camz r2
+
+            bsl r3 r3 4
+            add r3 r3 8  // adjust to centre of block
+            out %amogus_camy r3
+        
+            in r0 %meshgen_renderscene
+
+        // lose 1 heart at a time until death
+        .suffocationLoop
+            in r0 %amogus_drawtoscreen
+            cal .drawHotbar
+            in r0 %screen_buffer
+
+            imm r1, 255
+            .suffocationDelayLoop
+                add r1 r1 -1
+                nop
+                nop
+                bnz .suffocationDelayLoop r1
+            
+            lod r1 health
+            add r1 r1 -1
+            str health r1
+            bnz .suffocationLoop r1
+        
+        pop r4  // reload old block
+        out %blockram_id r4
+
+        jmp .gameOver
+
+.dontSuffocate
+    ret
 
 .gameOver
     in r0 %screen_clearscreen
@@ -1342,6 +1426,8 @@ ret
         pop r0
 ret
 
+
+// TODO: this does not work on chest faces! should we not draw them?
 
 .getRayCastTargetQuad 
     //get quad vertices //OPTIM: there is almost certainly a better way to do this
@@ -2481,7 +2567,6 @@ ret
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
 
             in r1 %playerinput  // clear crafting grid?
             brz .bank2_inventoryContinue r1
@@ -2775,7 +2860,6 @@ ret
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
             in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
 
             in r1 %playerinput  // clear crafting grid?
             brz .bank2_craftingContinue r1
@@ -2983,7 +3067,6 @@ ret
             lod r2 inventorySlot
             bne .bank2_furnaceSelectedAlready r1 0xFF  // already selected
                 // select new slot
-                bge .bank2_furnaceSkipSelectItem r2 0xA0  // out of bounds - do not select
                 str permanentSelectedSlot r2  // set new permanent slot
                 // NOTE: slot already highlighted (in previous section)
                 jmp .bank2_furnaceSkipSelectItem
@@ -3010,7 +3093,6 @@ ret
             str permanentSelectedSlot 0xFF  // remove permanent selected slot
             lod r7 inventorySlot  // redraw slot if needed
             cal .bank2_furnaceDrawSlotWithHighlight
-            jmp .bank2_craftingSkipSelectItem
         
         .bank2_furnaceSkipSelectItem
 
