@@ -328,20 +328,21 @@ export enum Block {
 }
 
 enum Quad {
-    fullBlockNegX, //0x00
-    fullBlockPosX, //0x01
+    fullBlockPosZ, //0x00
+    fullBlockNegX, //0x01
     fullBlockNegZ, //0x02
-    fullBlockPosZ, //0x03
+    fullBlockPosX, //0x03
+    
     fullBlockNegY, //0x04
     fullBlockPosY, //0x05
 
     crossBlock1, //0x06
     crossBlock2, //0x07
 
-    smallBlockNegX, //0x08
-    smallBlockPosX, //0x09
+    smallBlockPosZ, //0x08
+    smallBlockNegX, //0x09
     smallBlockNegZ, //0x0A
-    smallBlockPosZ, //0x0B
+    smallBlockPosX, //0x0B
     smallBlockNegY, //0x0C
     smallBlockPosY, //0x0D
 

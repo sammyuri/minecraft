@@ -28,7 +28,7 @@ minstack 23
         @define APPLEHEALTH 2
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
-        @define RANDOMTICKSPEED 10 // at this speed each block has 1/51 chance of being ticked every frame
+        @define RANDOMTICKSPEED 10 //TEMP: 10 is too high. At this speed each block has 1/51 chance of being ticked every frame
     //other constants
         @define BOTTOMOFSTACK 255 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -476,6 +476,9 @@ lstr inventory 4 0xFF
                                 bge .endBreakAndPlace r2 endBlockEntities //if r2 is outside of the array, no space found
                                 lod r2 r2
                                 brz .foundSpaceForChest r2
+                                jmp ~+3
+                            and r2 r2 0b11_000000
+                            bne ~+2 r2 0b01_000000
                                 add r1 r1 6
                             add r1 r1 6
                         brl .findSpaceForChestLoop r1 endBlockEntities
@@ -485,7 +488,7 @@ lstr inventory 4 0xFF
                         imm r2 0b01_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        subv r3 r3 10  // TODO: check this is correct
+                        addv r3 r3 10  // TODO: check this is correct
                         bsr r3 r3 2
                         bsl r3 r3 4
                         or r2 r2 r3
@@ -509,6 +512,9 @@ lstr inventory 4 0xFF
                         .findSpaceForFurnaceLoop
                             lod r2 r1
                             brz .foundSpaceForFurnace r2
+                            and r2 r2 0b11_000000
+                            bne ~+2 r2 0b01_000000
+                                add r1 r1 6
                             add r1 r1 6
                         brl .findSpaceForFurnaceLoop r1 endBlockEntities
                         //no space for furnace found
@@ -517,7 +523,7 @@ lstr inventory 4 0xFF
                         imm r2 0b10_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        subv r3 r3 10  // TODO: check this is correct
+                        addv r3 r3 10  // TODO: check this is correct
                         bsr r3 r3 2
                         bsl r3 r3 4
                         or r2 r2 r3
