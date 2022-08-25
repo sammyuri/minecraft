@@ -29,6 +29,7 @@ minstack 23
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
         @define RANDOMTICKSPEED 10 //TEMP: 10 is too high. At this speed each block has 1/51 chance of being ticked every frame
+        @define SMELTTIME 0x1600
     //other constants
         @define BOTTOMOFSTACK 255 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -118,6 +119,9 @@ minstack 23
         @define TEXTURE_HEARTEMPTY 136
         @define TEXTURE_HEARTFULL 137
         @define TEXTURE_GAMEOVER 0x90
+        @define TEXTURE_FURNACEFRONTOFF 19
+        @define TEXTURE_FURNACEFRONTON 20
+        @define TEXTURE_CHESTFRONT 23
     //other
         @define TOOL_PICKAXE 0
         @define TOOL_AXE 1
@@ -187,9 +191,9 @@ minstack 23
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
-lstr inventory 2 ITEM_IRONSHOVEL
-lstr inventory 3 0xE2
-lstr inventory 4 0xFF
+lstr inventory 2 0x89
+lstr inventory 3 0xFE
+lstr inventory 4 0xFE
 
 
 .mainLoop
@@ -488,7 +492,7 @@ lstr inventory 4 0xFF
                         imm r2 0b01_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        addv r3 r3 10  // TODO: check this is correct
+                        addv r3 r3 10
                         bsr r3 r3 2
                         bsl r3 r3 4
                         or r2 r2 r3
@@ -523,7 +527,7 @@ lstr inventory 4 0xFF
                         imm r2 0b10_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        addv r3 r3 10  // TODO: check this is correct
+                        addv r3 r3 10
                         bsr r3 r3 2
                         bsl r3 r3 4
                         or r2 r2 r3
@@ -964,11 +968,107 @@ lstr inventory 4 0xFF
             add r1 r1 3
         brl .updateItemEntitiesLoop r1 blockEntities
 
-    //TODO: update all furnaces
-        //loop through all block entities
-            //if furnace
-                //progress timers
-                //apply recipe
+    //TODO: test to see if updating all the furnaces properly works
+    //NOTE: furnace format as follows
+        //byte 0: II_DD_YYYY
+        //byte 1: XXXX_ZZZZ
+        //byte 2: fuel cell
+        //byte 3: item cell
+        //byte 4: result cell
+        //byte 5: timers - SSSS_FFFF; S=smelt, F=fuel
+    out %craftrom ITEM_FURNACE
+    imm r1 blockEntities //r1 = pointer
+    .updateFurnaceLoop
+        lod r2 r1
+        brn .notFurnace r2
+            //pseudocode
+                //decrement timers. If smelt timer wasn't at zero, try crafting
+                    //get recipe result
+                    //if there's room for the result in the result slot, add to result slot and remove from first slot
+                //if fuel timer is at 0, there is a valid recipe, and fuel is available, remove 1 fuel and start fuel timer
+                //if fuel timer is not at 0, there is a valid recipe, and smelt timer is at 0, start smelt timer
+
+            imm r7 0 //check for valid recipe, store validity in r7
+            add r2 r1 3
+            lod r2 r2
+            out %craftrom r2
+            in r2 %craftrom
+            brz .endCheckValidSmelt r2
+            add r3 r1 4
+            lod r3 r3 //result cell
+            bnz ~+3 r3
+                inc r7 r7
+                jmp .endCheckValidSmelt
+            and r4 r2 0xF0
+            and r5 r3 0xF0
+            bne .endCheckValidSmelt r4 r5
+            and r2 r2 0x0F
+            and r3 r3 0x0F
+            add r2 r2 r3
+            brg .endCheckValidSmelt r2 0x0F
+                inc r7 r7
+            .endCheckValidSmelt
+
+            add r2 r1 5 //r2 = pointer to timers
+            lod r3 r2 //r3 = timers
+            
+            ble .endSmeltTimer r3 0x0F //smelt timer
+                sub r3 r3 0x10
+                brg .endSmeltTimer r3 0x0F
+                dec r3 r3 //decrement fuel timer
+                brz .endSmeltTimer r7
+                    //finish smelting item
+                    in r4 %craftrom
+                    and r4 r4 0x0F
+                    add r5 r1 4
+                    lod r6 r5
+                    addv r4 r4 r6
+                    str r5 r4
+                    add r4 r1 3
+                    lod r5 r4
+                    dec r5 r5
+                    and r6 r5 0x0F
+                    bnz ~+2 r6
+                        mov r5 r0
+                    str r4 r5
+            .endSmeltTimer
+            brz .endUpdateCurrentFurnace r7
+                and r4 r3 0x0F //fuel timer
+                brz .fuelTimerNotZero r4
+                    add r6 r1 2
+                    lod r4 r6 //fuel item
+                    and r5 r4 0xF0
+                    bre ~+6 r5 ITEM_STICK
+                    bre ~+5 r5 ITEM_WOODPICKAXE
+                    bre ~+4 r5 ITEM_WOODSHOVEL
+                    bre ~+3 r5 ITEM_WOODSWORD
+                    bre ~+2 r5 ITEM_WOODAXE
+                    bne ~+2 r5 ITEM_SAPLING
+                        add r3 r3 1
+                    bre ~+2 r5 ITEM_PLANK
+                    bne ~+2 r5 ITEM_LOG
+                        add r3 r3 2
+                    bne ~+2 r5 ITEM_COAL
+                        add r3 r3 8
+                    dec r4 r4
+                    and r5 r4 0x0F
+                    bnz ~+2 r5
+                        imm r4 r4 0
+                    str r6 r4
+                    jmp .endUpdateCurrentFurnace
+                .fuelTimerNotZero
+                    brg ~+2 r3 0x0F
+                        add r3 r3 SMELTTIME
+            .endUpdateCurrentFurnace
+            str r2 r3
+            jmp .updateFurnaceLoopNext
+        .notFurnace
+        lsh r2 r2
+        brn ~+2 r2 //if chest, advance pointer further
+            add r1 r1 6
+        .updateFurnaceLoopNext
+        add r1 r1 6
+    brl .updateFurnaceLoop r1 endBlockEntities
     
     imm r5 RANDOMTICKSPEED  // number of random ticks per frame
     .randomTickLoop
@@ -1198,20 +1298,24 @@ lstr inventory 4 0xFF
                 brz .renderBlockEntityFaceLoopContinue r2
                     and r3 r2 0x0F
                     out %meshgen_blocky r3  // get position
-                    inc r1 r1
-                    lod r3 r1
-                    dec r1 r1
+                    inc r3 r1
+                    lod r3 r3
                     out %meshgen_blockxz r3
 
-                    imm r4 0x13  // furnace front texture
+                    imm r4 TEXTURE_CHESTFRONT
                     bsr r3 r2 6  // make face smaller if chest
                     and r3 r3 1
                     out %meshgen_settings r3
                     bsr r3 r2 4  // get direction
                     and r3 r3 3
                     out %meshgen_direction r3
-                    brz ~+2 r3
-                        add r4 r4 4  // chest front texture
+                    brz ~+6 r2 //furnace
+                        imm r4 TEXTURE_FURNACEFRONTOFF
+                        add r3 r1 5
+                        lod r3 r3
+                        brz ~+2 r3
+                            imm r4 TEXTURE_FURNACEFRONTON
+                        
                     out %amogus_tex r4
                     out %amogus_settings r0
                     in r0 %meshgen_renderface
@@ -3495,7 +3599,102 @@ ret
         
         .bank2_furnaceSkipSelectItem
 
-            // TODO: add furnace loop code here
+    //TODO: test to see if updating all the furnaces properly works
+    //NOTE: furnace format as follows
+        //byte 0: II_DD_YYYY
+        //byte 1: XXXX_ZZZZ
+        //byte 2: fuel cell
+        //byte 3: item cell
+        //byte 4: result cell
+        //byte 5: timers - SSSS_FFFF; S=smelt, F=fuel
+    out %craftrom ITEM_FURNACE
+    imm r1 blockEntities //r1 = pointer
+    .bank2_updateFurnaceLoop
+        lod r2 r1
+        brn .bank2_notFurnace r2
+            //pseudocode
+                //decrement timers. If smelt timer wasn't at zero, try crafting
+                    //get recipe result
+                    //if there's room for the result in the result slot, add to result slot and remove from first slot
+                //if fuel timer is at 0, there is a valid recipe, and fuel is available, remove 1 fuel and start fuel timer
+                //if fuel timer is not at 0, there is a valid recipe, and smelt timer is at 0, start smelt timer
+
+            imm r7 0 //check for valid recipe, store validity in r7
+            add r2 r1 3
+            lod r2 r2
+            out %craftrom r2
+            in r2 %craftrom
+            brz .bank2_endCheckValidSmelt r2
+            add r3 r1 4
+            lod r3 r3 //result cell
+            bnz ~+3 r3
+                inc r7 r7
+                jmp .bank2_endCheckValidSmelt
+            and r4 r2 0xF0
+            and r5 r3 0xF0
+            bne .bank2_endCheckValidSmelt r4 r5
+            and r2 r2 0x0F
+            and r3 r3 0x0F
+            add r2 r2 r3
+            brg .bank2_endCheckValidSmelt r2 0x0F
+                inc r7 r7
+            .bank2_endCheckValidSmelt
+
+            add r2 r1 5 //r2 = pointer to timers
+            lod r3 r2 //r3 = timers
+            
+            ble .bank2_endSmeltTimer r3 0x0F //smelt timer
+                sub r3 r3 0x10
+                brg .bank2_endSmeltTimer r3 0x0F
+                dec r3 r3 //decrement fuel timer
+                brz .bank2_endSmeltTimer r7
+                    //finish smelting item
+                    in r4 %craftrom
+                    and r4 r4 0x0F
+                    add r5 r1 4
+                    lod r6 r5
+                    addv r4 r4 r6
+                    str r5 r4
+                    add r4 r1 3
+                    lod r5 r4
+                    dec r5 r5
+                    and r6 r5 0x0F
+                    bnz ~+2 r6
+                        mov r5 r0
+                    str r4 r5
+            .bank2_endSmeltTimer
+            brz .bank2_endUpdateCurrentFurnace r7
+                and r4 r3 0x0F //fuel timer
+                brz .bank2_fuelTimerNotZero r4
+                    add r4 r1 2
+                    lod r4 r4 //fuel item
+                    and r4 r4 0xF0
+                    bre ~+6 r4 ITEM_STICK
+                    bre ~+5 r4 ITEM_WOODPICKAXE
+                    bre ~+4 r4 ITEM_WOODSHOVEL
+                    bre ~+3 r4 ITEM_WOODSWORD
+                    bre ~+2 r4 ITEM_WOODAXE
+                    bne ~+2 r4 ITEM_SAPLING
+                        add r3 r3 1
+                    bre ~+2 r4 ITEM_PLANK
+                    bne ~+2 r4 ITEM_LOG
+                        add r3 r3 2
+                    bne ~+2 r4 ITEM_COAL
+                        add r3 r3 8
+                    jmp .bank2_endUpdateCurrentFurnace
+                .bank2_fuelTimerNotZero
+                    brg ~+2 r3 0x0F
+                        add r3 r3 SMELTTIME
+            .bank2_endUpdateCurrentFurnace
+            str r2 r3
+            jmp .bank2_updateFurnaceLoopNext
+        .bank2_notFurnace
+        lsh r2 r2
+        brn ~+2 r2 //if chest, advance pointer further
+            add r1 r1 6
+        .bank2_updateFurnaceLoopNext
+        add r1 r1 6
+    brl .bank2_updateFurnaceLoop r1 endBlockEntities
 
             in r1 %playerinput  // if nonzero, take from furnace
             brz ~+1 r1
