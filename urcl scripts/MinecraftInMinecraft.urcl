@@ -186,7 +186,7 @@ lstr inventory 0 0x14
 lstr inventory 1 0x55
 lstr inventory 2 ITEM_IRONSHOVEL
 lstr inventory 3 0xE2
-lstr inventory 4 0xFD
+lstr inventory 4 0xFF
 
 
 .mainLoop
@@ -348,7 +348,19 @@ lstr inventory 4 0xFD
                             cal .createEntity
                     //jmp .endDropItem
                 .endDropItem
-                //TODO: if broken block is a block entity, remove it from the block entities list
+                // check if tile entity
+                psh r1
+                psh r2
+                    mov r7, r4
+                    mov r6, r3
+                    cal .findBlockEntity
+                    brz ~+2 r1  // reset if found (set first byte to 0)
+                        str r1 0
+                    mov r4, r7
+                    mov r3, r6
+                pop r2
+                pop r1
+
                 bsr r7 r3 4
                 out %blockram_x r7
                 and r7 r3 0x0f
@@ -377,10 +389,19 @@ lstr inventory 4 0xFD
                 lod r7 crouching
                 brl .endUseTargetedBlock r5 BLOCK_TABLE //check if targeted block is usable, if so, use it
                     bre .bank2_loadCraftingGUI r5 BLOCK_TABLE  // crafting
-                    //TODO: use targeted block if tile entity
-                        //search through blockEntity array until match is found
-                        //set loadedBlockEntity pointer towards that block
-                        //jump to appropriate location in bank2
+
+                    // find targeted block entity
+                    mov r7, r4
+                    mov r6, r3
+                    cal .findBlockEntity
+                    brz .endUseTargetedBlock r1  // no match
+                    str loadedTileEntity r1
+
+                    // jump to appropriate location in bank2
+                    and r2 r2 0b01000000
+                    brz .bank2_loadFurnaceGUI r2
+                    jmp .bank2_loadChestGUI
+
                 .endUseTargetedBlock
                 lod r6 inventorySlot
                 add r6 inventory r6
@@ -475,7 +496,7 @@ lstr inventory 4 0xFD
                             mov r2 r0 //loop 10 times to clear anny residual memory cells in the chest
                                 inc r1 r1
                                 str r1 r0
-                            inc r2
+                            inc r2 r2
                             ble ~-3 r2 10
                         jmp .placeBlock
                     .endCreateChestEntity
@@ -512,7 +533,7 @@ lstr inventory 4 0xFD
                             mov r2 r0 //loop 4 times to clear anny residual memory cells in the furnace
                                 inc r1 r1
                                 str r1 r0
-                            inc r2
+                            inc r2 r2
                             ble ~-3 r2 4
                         jmp .placeBlock
                     .endCreateFurnaceEntity
@@ -1518,6 +1539,32 @@ ret
         pop r0
         pop r0
         pop r0
+ret
+
+
+.findBlockEntity
+    // inputs:
+    // r6: 0000_0yyy
+    // r7: 0xxx_0zzz
+    // output:
+    // r1: memory address of block entity (or 0 if not found)
+    imm r1 blockEntities
+    .findBlockEntityLoop
+        lod r2 r1
+        brz ~+8 r2
+            and r3 r2 0x0F  // check y matches
+            bne ~+6 r3 r7
+                inc r1 r1
+                lod r4 r1
+                dec r1 r1
+                bne ~+2 r4 r6  // check xz matches
+                    ret
+        and r2 r2 0b01000000  // check if chest
+        brz ~+2 r2
+            add r1 r1 6
+        add r1 r1 6
+        brl .findBlockEntityLoop r1 endBlockEntities
+    imm r1 0  // failed to find
 ret
 
 
@@ -3299,7 +3346,7 @@ ret
         lod r2 inventorySlot
             // moving within inventory
             bne ~+5 r1 0x10  // move up
-                brl ~+3 r2 0x50  // top of inventory
+                brl ~+3 r2 0x40  // top of inventory
                     sub r2 r2 0x40  // move to crafting grid
                     jmp ~+2
                 add r2 r2 r1
