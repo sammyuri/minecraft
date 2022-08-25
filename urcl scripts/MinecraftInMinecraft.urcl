@@ -974,7 +974,6 @@ lstr inventory 4 0xFF
                 //progress timers
                 //apply recipe
     
-    //TODO: do random ticks
     imm r5 RANDOMTICKSPEED  // number of random ticks per frame
     .randomTickLoop
         //select random block
@@ -1341,9 +1340,51 @@ jmp .mainLoop
             add r2 r2 8
             ble ~-4 r2 63
 
-    //TODO: respawning
     in r0 %screen_buffer
-hlt
+
+    // respawns the player in the same spot they died
+    // keeps moving the player up a block until they don't spawn inside blocks
+    // (in case of suffocation-induced death)
+
+    lod r1 x  // centre player on block
+    and r1 r1 0b1111_0000 
+    add r1 r1 3
+    str x r1
+
+    lod r3 z
+    and r3 r3 0b1111_0000
+    add r3 r3 3
+    str z r3
+
+    lod r2 y
+    bsr r2 r2 4
+    bsr r1 r1 4
+    out %blockram_x r1
+    bsr r3 r3 4
+    out %blockram_z r3
+    in r0 %blockram_oobinactive  // allow respawning at y=7 or 8
+
+    .respawnPositionLoop
+        // check bottom block of player
+        out %blockram_y r2
+        inc r2 r2
+        in r4 %blockram_id
+        brz ~+2 r4  // air
+        bne .respawnPositionLoop r4 BLOCK_SAPLING
+        // check top block of player
+        out %blockram_y r2
+        in r4 %blockram_id
+        brz ~+2 r4  // air
+        bne .respawnPositionLoop r4 BLOCK_SAPLING
+
+    bsl r2 r2 4
+    str y r2
+    out %playerinput r0
+    in r0 %playerinput
+
+    hlt  // NOTE: remove hlt in ChAsm
+
+jmp .continueFromClosingInventory
 
 //createEntity function: creates a new item entity based on a location and an entity ID
     //inputs:
@@ -1937,6 +1978,7 @@ ret
     out %blockram_y r2
     dec r2 r2
     in r6 %blockram_id
+    out %blockram_y r2
     bre ~+4 r6 BLOCK_AIR
     bre ~+3 r6 BLOCK_LEAVES
     bre ~+2 r6 BLOCK_GLASS
