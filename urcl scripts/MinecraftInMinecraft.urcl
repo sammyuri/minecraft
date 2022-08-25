@@ -994,32 +994,41 @@ lstr inventory 4 0xFF
             cal .checkBlockAbove
             bnz .randomTickNotDirt r7
                 psh r5
-                add r5 r1 -2
-                add r6 r2 -2
-                add r7 r3 -2
+                add r1 r1 1
+                add r2 r2 1
+                add r3 r3 1
 
                 // check all surrounding blocks in a 3x3 cube
+                add r5 r1 -3
                 .grassSpreadingLoopX
                     inc r5 r5
                     out %blockram_x r5
+                    add r6 r2 -3
                     .grassSpreadingLoopY
                         inc r6 r6
                         out %blockram_y r6
+                        add r7 r3 -3
                         .grassSpreadingLoopZ
                             inc r7 r7
                             out %blockram_z r7
                             in r4 %blockram_id
                             bre .grassSpreadingFoundGrass r4 BLOCK_GRASS
-                        ble .grassSpreadingLoopZ r7 r3
-                    ble .grassSpreadingLoopY r6 2
-                ble .grassSpreadingLoopX r5 r1
+                        bne .grassSpreadingLoopZ r7 r3
+                    bne .grassSpreadingLoopY r6 r2
+                bne .grassSpreadingLoopX r5 r1
 
             // no adjacent grass
             pop r5
+            add r1 r1 -1
+            add r2 r2 -1
+            add r3 r3 -1
             jmp .randomTickLoopContinue
 
             .grassSpreadingFoundGrass
             pop r5
+            add r1 r1 -1
+            add r2 r2 -1
+            add r3 r3 -1
             out %blockram_x r1  // get block again
             out %blockram_y r2
             out %blockram_z r3
@@ -1046,7 +1055,92 @@ lstr inventory 4 0xFF
 
         .randomTickNotLeaves
         bne .randomTickLoopContinue r4 BLOCK_SAPLING
-            //TODO: grow tree
+            // grow tree
+            //  LLL 
+            //  LTL 
+            // LLTLL
+            // LLTLL
+            //   T  
+            //   T (randomly 5 or 6 tall)
+            in r4 %rng  // get height of tree
+            and r4 r4 1
+
+            // create 5x5x2 cuboid of leaves
+            psh r4
+            psh r5
+            add r1 r1 2  // x
+            add r3 r3 2  // z
+            add r4 r4 2  // y
+            add r2 r2 r4
+
+            add r5 r1 -5
+            .treeBottomLoopX
+                inc r5 r5
+                out %blockram_x r5
+                add r6 r2 -2
+                .treeBottomLoopY
+                    inc r6 r6
+                    out %blockram_y r6
+                    add r7 r3 -5
+                    .treeBottomLoopZ
+                        inc r7 r7
+                        out %blockram_z r7
+                        in r4 %blockram_id  // avoid replacing non-air blocks
+                        bnz ~+2 r4
+                            out %blockram_id BLOCK_LEAVES
+                    bne .treeBottomLoopZ r7 r3
+                bne .treeBottomLoopY r6 r2
+            bne .treeBottomLoopX r5 r1
+
+            // create 3x3x2 cuboid of leaves
+            add r1 r1 -1 // x
+            add r3 r3 -1  // z
+            add r2 r2 2 // y
+
+            add r5 r1 -3
+            .treeTopLoopX
+                inc r5 r5
+                out %blockram_x r5
+                add r6 r2 -2
+                .treeTopLoopY
+                    inc r6 r6
+                    out %blockram_y r6
+                    add r7 r3 -3
+                    .treeTopLoopZ
+                        inc r7 r7
+                        out %blockram_z r7
+                        in r4 %blockram_id  // avoid replacing non-air blocks
+                        bnz ~+2 r4
+                            out %blockram_id BLOCK_LEAVES
+                    bne .treeTopLoopZ r7 r3
+                bne .treeTopLoopY r6 r2
+            bne .treeTopLoopX r5 r1
+
+            // create trunk
+            pop r5
+            pop r4
+            add r1 r1 -1
+            add r3 r3 -1
+            add r7 r2 -4  // original sapling position
+            sub r7 r7 r4
+            out %blockram_x r1
+            out %blockram_z r3
+            lod r4 logsInWorld
+
+            .treeTrunkLoop
+                dec r2 r2
+                out %blockram_y r2
+                in r6 %blockram_id
+                brz ~+2 r6  // replace air
+                bne ~+3 r6 BLOCK_LEAVES  // replace leaves
+                    out %blockram_id BLOCK_LOG
+                    inc r4 r4
+            bne .treeTrunkLoop r2 r7
+            out %blockram_id BLOCK_LOG
+            inc r4 r4
+                    
+            str logsInWorld r4
+            str needReRender @max  // force rerender
 
         .randomTickLoopContinue
         dec r5 r5  // loop for all random ticks
