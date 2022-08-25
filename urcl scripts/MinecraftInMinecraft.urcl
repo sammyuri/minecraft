@@ -28,6 +28,7 @@ minstack 23
         @define APPLEHEALTH 2
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
+        @define RANDOMTICKSPEED 10 // at this speed each block has 1/51 chance of being ticked every frame
     //other constants
         @define BOTTOMOFSTACK 255 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -162,8 +163,9 @@ minstack 23
     @define health m41
     @define loadedTileEntity m42
     @define newestItemEntity m43
-    @define itemEntities m44
-    @define blockEntities m116
+    @define logsInWorld m44
+    @define itemEntities m45
+    @define blockEntities m117
     @define endBlockEntities m224
 
 //initial values
@@ -180,7 +182,8 @@ minstack 23
     str prevZ 0
     str permanentSelectedSlot 0xFF // outside the inventory
     str health MAXHEALTH
-    str newestItemEntity health //initialize to 3 cells before the start of the array, which happens to be where health is located.
+    str newestItemEntity loadedTileEntity //initialize to 3 cells before the start of the array
+    str logsInWorld 4  // set to number of log blocks in initial world
 
 lstr inventory 0 0x14
 lstr inventory 1 0x55
@@ -227,6 +230,11 @@ lstr inventory 4 0xFF
             brz .endBreakBlock r7
                 brn .endBreakBlock r5 //if bedrock, can't break block
                 bre .endBlockBreakAnim r5 BLOCK_SAPLING //break block instantly if it's a sapling
+                // check if log
+                bne ~+4 r5 BLOCK_LOG
+                    lod r7 logsInWorld
+                    dec r7 r7
+                    str logsInWorld r7
                 //add block-breaking animation
                     cal .getRayCastTargetQuad
                     //stack:
@@ -348,9 +356,9 @@ lstr inventory 4 0xFF
                             cal .createEntity
                     //jmp .endDropItem
                 .endDropItem
-                // check if tile entity
                 psh r1
                 psh r2
+                // check if tile entity
                     mov r7, r4
                     mov r6, r3
                     cal .findBlockEntity
@@ -552,6 +560,10 @@ lstr inventory 4 0xFF
                     jmp .removeItemFromInventory
                 .placeBlock
                     out %blockram_id r6
+                    bne ~+4 r6 BLOCK_LOG  // if log, add 1 to log count
+                        lod r1 logsInWorld
+                        inc r1 r1
+                        str logsInWorld r1
                     .removeItemFromInventory
                         lod r1 inventorySlot
                         add r1 inventory r1
@@ -963,13 +975,82 @@ lstr inventory 4 0xFF
                 //apply recipe
     
     //TODO: do random ticks
-        //select random block (maybe include out-of-bounds blocks to reduce chance of selecting an actual block each tick)?
-            //if dirt
-                //if block above is transparent and there is an adjacent grass, become grass
-            //if grass
-                //if block above is not transparent become dirt
-            //if sapling
-                //grow tree
+    imm r5 RANDOMTICKSPEED  // number of random ticks per frame
+    .randomTickLoop
+        //select random block
+        in r1 %rng  // x
+        and r1 r1 0x07
+        in r2 %rng  // y
+        and r2 r2 0x07
+        in r3 %rng  // z
+        and r3 r3 0x07
+
+        out %blockram_x r1  // get block
+        out %blockram_y r2
+        out %blockram_z r3
+        in r4 %blockram_id
+        
+        bne .randomTickNotDirt r4 BLOCK_DIRT
+            cal .checkBlockAbove
+            bnz .randomTickNotDirt r7
+                psh r5
+                add r5 r1 -2
+                add r6 r2 -2
+                add r7 r3 -2
+
+                // check all surrounding blocks in a 3x3 cube
+                .grassSpreadingLoopX
+                    inc r5 r5
+                    out %blockram_x r5
+                    .grassSpreadingLoopY
+                        inc r6 r6
+                        out %blockram_y r6
+                        .grassSpreadingLoopZ
+                            inc r7 r7
+                            out %blockram_z r7
+                            in r4 %blockram_id
+                            bre .grassSpreadingFoundGrass r4 BLOCK_GRASS
+                        ble .grassSpreadingLoopZ r7 r3
+                    ble .grassSpreadingLoopY r6 2
+                ble .grassSpreadingLoopX r5 r1
+
+            // no adjacent grass
+            pop r5
+            jmp .randomTickLoopContinue
+
+            .grassSpreadingFoundGrass
+            pop r5
+            out %blockram_x r1  // get block again
+            out %blockram_y r2
+            out %blockram_z r3
+            out %blockram_id BLOCK_GRASS
+            str needReRender @max  // force rerender
+            jmp .randomTickLoopContinue
+
+        .randomTickNotDirt
+        in r4 %blockram_id
+        bne .randomTickNotGrass r4 BLOCK_GRASS
+            cal .checkBlockAbove
+            brz ~+3 r7
+                out %blockram_id BLOCK_DIRT
+                str needReRender @max  // force rerender
+            jmp .randomTickLoopContinue
+
+        .randomTickNotGrass
+        bne .randomTickNotLeaves r4 BLOCK_LEAVES
+            lod r7 logsInWorld  // only decay leaves when there are no logs in world
+            bnz ~+3 r7
+                out %blockram_id r0  // NOTE: leaves decaying does not generate item
+                str needReRender @max  // force rerender
+            jmp .randomTickLoopContinue
+
+        .randomTickNotLeaves
+        bne .randomTickLoopContinue r4 BLOCK_SAPLING
+            //TODO: grow tree
+
+        .randomTickLoopContinue
+        dec r5 r5  // loop for all random ticks
+    bnz .randomTickLoop r5
 
     //do rendering stuff
         //check if full render is necessary
@@ -1757,6 +1838,19 @@ ret //NOTE: this only works with a callstack because of stack stuff
     brl .buildQuadFromStackLoop r2 4 //loop exactly 4 times
 ret
 
+.checkBlockAbove
+    inc r2 r2
+    out %blockram_y r2
+    dec r2 r2
+    in r6 %blockram_id
+    bre ~+4 r6 BLOCK_AIR
+    bre ~+3 r6 BLOCK_LEAVES
+    bre ~+2 r6 BLOCK_GLASS
+    bne ~+3 r6 BLOCK_SAPLING
+    imm r7 0
+ret
+    imm r7 1
+ret
 
 //drawItem function
     //description:
