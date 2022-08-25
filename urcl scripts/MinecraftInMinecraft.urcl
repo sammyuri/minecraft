@@ -1784,7 +1784,19 @@ ret
 ret
 
 
-// TODO: this does not work on chest faces! should we not draw them?
+.getRayCastTargetQuadBeginning
+    and r6 r3 0xf0 //r6 = X
+    bsl r7 r3 4 //r7 = Z
+    //r4 = Y
+    psh r5
+    bre ~+3 r5 BLOCK_CHEST  // use smaller face if chest
+        imm r5 16
+        ret
+    imm r5 14
+    add r6 r6 1  // move over half a pixel
+    add r7 r7 1
+ret
+    
 
 .getRayCastTargetQuad 
     //get quad vertices //OPTIM: there is almost certainly a better way to do this
@@ -1799,14 +1811,12 @@ ret
         brg .targetPosZQuad r6 r7
         //brl .targetNegXQuad r6 r7
         .targetNegZQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
+            cal .getRayCastTargetQuadBeginning
             
-            add r6 r6 16
+            add r6 r6 r5
             psh r6 //vert4x
             psh r6 //vert3x
-            sub r6 r6 16
+            sub r6 r6 r5
             psh r6 //vert2x
             psh r6 //vert1x
 
@@ -1816,7 +1826,7 @@ ret
             psh r7 //vert1z
 
             bsl r7 r4 4
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4y
             psh r6 //vert3y
             psh r6 //vert2y
@@ -1824,24 +1834,22 @@ ret
 
             jmp .endGetQuad
         .targetPosZQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
+            cal .getRayCastTargetQuadBeginning
 
             psh r6 //vert4x
             psh r6 //vert3x
-            add r6 r6 16
+            add r6 r6 r5
             psh r6 //vert2x
             psh r6 //vert1x
 
-            add r6 r7 16
+            add r6 r7 r5
             psh r6 //vert4z
             psh r6 //vert3z
             psh r6 //vert2z
             psh r6 //vert1z
 
             bsl r7 r4 4
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4y
             psh r6 //vert3y
             psh r6 //vert2y
@@ -1849,23 +1857,21 @@ ret
 
             jmp .endGetQuad
         .targetNegXQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
+            cal .getRayCastTargetQuadBeginning
 
             psh r6 //vert4x
             psh r6 //vert3x
             psh r6 //vert2x
             psh r6 //vert1x
 
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4z
             psh r7 //vert3z
             psh r6 //vert2z
             psh r6 //vert1z
 
             bsl r7 r4 4
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4y
             psh r6 //vert3y
             psh r6 //vert2y
@@ -1873,23 +1879,22 @@ ret
 
             jmp .endGetQuad
         .targetPosXQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
-            add r6 r6 16
+            cal .getRayCastTargetQuadBeginning
+
+            add r6 r6 r5
             psh r6 //vert4x
             psh r6 //vert3x
             psh r6 //vert2x
             psh r6 //vert1x
 
-            add r6 r7 16
+            add r6 r7 r5
             psh r6 //vert4z
             psh r6 //vert3z
             psh r7 //vert2z
             psh r7 //vert1z
 
             bsl r7 r4 4
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4y
             psh r6 //vert3y
             psh r6 //vert2y
@@ -1897,18 +1902,16 @@ ret
 
             jmp .endGetQuad
         .targetNegYQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
+            cal .getRayCastTargetQuadBeginning
             
-            add r6 r6 16
+            add r6 r6 r5
             psh r6 //vert4x
             psh r6 //vert3x
-            sub r6 r6 16
+            sub r6 r6 r5
             psh r6 //vert2x
             psh r6 //vert1x
 
-            add r6 r7 16
+            add r6 r7 r5
             psh r6 //vert4z
             psh r7 //vert3z
             psh r7 //vert2z
@@ -1922,25 +1925,23 @@ ret
 
             jmp .endGetQuad
         .targetPosYQuad
-            and r6 r3 0xf0 //r6 = X
-            bsl r7 r3 4 //r7 = Z
-            //r4 = Y
+            cal .getRayCastTargetQuadBeginning
             
-            add r6 r6 16
+            add r6 r6 r5
             psh r6 //vert4x
             psh r6 //vert3x
-            sub r6 r6 16
+            sub r6 r6 r5
             psh r6 //vert2x
             psh r6 //vert1x
 
-            add r6 r7 16
+            add r6 r7 r5
             psh r7 //vert4z
             psh r6 //vert3z
             psh r6 //vert2z
             psh r7 //vert1z
 
             bsl r7 r4 4
-            add r6 r7 16
+            add r6 r7 r5
             psh r6 //vert4y
             psh r6 //vert3y
             psh r6 //vert2y
@@ -1950,6 +1951,7 @@ ret
         psh 0x88 //vert3uv
         psh 0x08 //vert2uv
         psh 0x00 //vert1uv
+        llod r5 sp 16
 ret //NOTE: this only works with a callstack because of stack stuff
 
 .buildQuadFromStack
