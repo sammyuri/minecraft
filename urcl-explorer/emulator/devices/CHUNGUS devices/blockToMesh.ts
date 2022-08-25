@@ -23,11 +23,8 @@ export class MeshGen implements Device {
         id: 0
     }
     face = {
-        texture: Texture.empty,
-
         small: false,
-        direction: 0,
-        texSettings: 0b0000
+        direction: 0
     }
     outputs = {
         [IO_Port.MESHGEN_BLOCKXZ]: (i:number) => {
@@ -50,13 +47,11 @@ export class MeshGen implements Device {
         [IO_Port.MESHGEN_ITEMID]: (i:number) => {
             this.item.id = i;
         },
-        [IO_Port.MESHGEN_TEXID]: (i:number) => {
-            this.face.texture = i;
+        [IO_Port.MESHGEN_DIRECTION]: (i:number) => {
+            this.face.direction = i;
         },
         [IO_Port.MESHGEN_SETTINGS]: (i:number) => {
-            this.face.small = (i & 0b0100_0000) != 0;
-            this.face.direction = (i & 0b0011_0000) >> 4;
-            this.face.texSettings = i & 0b0000_1111;
+            this.face.small = i != 0
         }
     }
     inputs = {
@@ -73,7 +68,7 @@ export class MeshGen implements Device {
             return 0;
         },
         [IO_Port.MESHGEN_RENDERFACE]: () => {
-            this.RenderFace(this.block.x, this.block.y, this.block.z, this.face.texture, this.face.direction, this.face.small);
+            this.RenderFace(this.block.x, this.block.y, this.block.z, undefined, this.face.direction, this.face.small);
             return 0;
         }
     }
@@ -107,7 +102,7 @@ export class MeshGen implements Device {
         this.RenderQuad(x, y, z, Quad.itemShadow, Texture.shadow, 0b1110);
     }
 
-    RenderFace(x:number, y:number, z:number, texId:Texture, direction:number, small:boolean):void {
+    RenderFace(x:number, y:number, z:number, texId:Texture|undefined, direction:number, small:boolean):void {
         let quadId = direction + (small ? 8 : 0);
         this.RenderQuad(x, y, z, quadId, texId, 0b1000);
     }
@@ -229,7 +224,7 @@ export class MeshGen implements Device {
         }
     }
 
-    RenderQuad(x:number, y:number, z:number, quadId:Quad, texId:Texture, texSettings:number):void {
+    RenderQuad(x:number, y:number, z:number, quadId:Quad, texId:Texture|undefined, texSettings:number|undefined):void {
         let quad:Vertex[] = [];
         const Uvs = [
             [0, 0],
@@ -248,11 +243,15 @@ export class MeshGen implements Device {
             )
             quad[i] = this.amogus.world_to_cam(vertex);
         }
-        this.amogus.texture = texId;
-        this.amogus.settings.cullBackface = (texSettings & 0b1000) != 0;
-        this.amogus.settings.transparent = (texSettings & 0b0100) != 0;
-        this.amogus.settings.inverted = (texSettings & 0b0010) != 0;
-        this.amogus.settings.overlay = (texSettings & 0b0001) != 0;
+        if (texId !== undefined) {
+            this.amogus.texture = texId;
+        }
+        if (texSettings !== undefined) {
+            this.amogus.settings.cullBackface = (texSettings & 0b1000) != 0;
+            this.amogus.settings.transparent = (texSettings & 0b0100) != 0;
+            this.amogus.settings.inverted = (texSettings & 0b0010) != 0;
+            this.amogus.settings.overlay = (texSettings & 0b0001) != 0;
+        }
         this.amogus.drawQuad(quad);
     }
 

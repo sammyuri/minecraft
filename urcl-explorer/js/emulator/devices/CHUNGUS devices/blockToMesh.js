@@ -15,10 +15,8 @@ export class MeshGen {
             id: 0
         };
         this.face = {
-            texture: Texture.empty,
             small: false,
-            direction: 0,
-            texSettings: 0b0000
+            direction: 0
         };
         this.outputs = {
             [IO_Port.MESHGEN_BLOCKXZ]: (i) => {
@@ -41,13 +39,11 @@ export class MeshGen {
             [IO_Port.MESHGEN_ITEMID]: (i) => {
                 this.item.id = i;
             },
-            [IO_Port.MESHGEN_TEXID]: (i) => {
-                this.face.texture = i;
+            [IO_Port.MESHGEN_DIRECTION]: (i) => {
+                this.face.direction = i;
             },
             [IO_Port.MESHGEN_SETTINGS]: (i) => {
-                this.face.small = (i & 64) != 0;
-                this.face.direction = (i & 48) >> 4;
-                this.face.texSettings = i & 15;
+                this.face.small = i != 0;
             }
         };
         this.inputs = {
@@ -64,7 +60,7 @@ export class MeshGen {
                 return 0;
             },
             [IO_Port.MESHGEN_RENDERFACE]: () => {
-                this.RenderFace(this.block.x, this.block.y, this.block.z, this.face.texture, this.face.direction, this.face.small);
+                this.RenderFace(this.block.x, this.block.y, this.block.z, undefined, this.face.direction, this.face.small);
                 return 0;
             }
         };
@@ -228,11 +224,15 @@ export class MeshGen {
             let vertex = new Vertex(x * 16 + template[i][0], y * 16 + template[i][1], z * 16 + template[i][2], Uvs[i][0], Uvs[i][1]);
             quad[i] = this.amogus.world_to_cam(vertex);
         }
-        this.amogus.texture = texId;
-        this.amogus.settings.cullBackface = (texSettings & 0b1000) != 0;
-        this.amogus.settings.transparent = (texSettings & 0b0100) != 0;
-        this.amogus.settings.inverted = (texSettings & 0b0010) != 0;
-        this.amogus.settings.overlay = (texSettings & 0b0001) != 0;
+        if (texId !== undefined) {
+            this.amogus.texture = texId;
+        }
+        if (texSettings !== undefined) {
+            this.amogus.settings.cullBackface = (texSettings & 0b1000) != 0;
+            this.amogus.settings.transparent = (texSettings & 0b0100) != 0;
+            this.amogus.settings.inverted = (texSettings & 0b0010) != 0;
+            this.amogus.settings.overlay = (texSettings & 0b0001) != 0;
+        }
         this.amogus.drawQuad(quad);
     }
     isTransparent(blockID) {

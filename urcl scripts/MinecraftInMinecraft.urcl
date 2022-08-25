@@ -1048,7 +1048,8 @@ lstr inventory 4 0xFF
         bne .randomTickNotLeaves r4 BLOCK_LEAVES
             lod r7 logsInWorld  // only decay leaves when there are no logs in world
             bnz ~+3 r7
-                out %blockram_id r0  // NOTE: leaves decaying does not generate item
+                out %blockram_id r0
+                //TODO: make leaves decaying drop items
                 str needReRender @max  // force rerender
             jmp .randomTickLoopContinue
 
