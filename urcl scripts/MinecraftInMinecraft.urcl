@@ -3666,21 +3666,26 @@ ret
             brz .bank2_endUpdateCurrentFurnace r7
                 and r4 r3 0x0F //fuel timer
                 brz .bank2_fuelTimerNotZero r4
-                    add r4 r1 2
-                    lod r4 r4 //fuel item
-                    and r4 r4 0xF0
-                    bre ~+6 r4 ITEM_STICK
-                    bre ~+5 r4 ITEM_WOODPICKAXE
-                    bre ~+4 r4 ITEM_WOODSHOVEL
-                    bre ~+3 r4 ITEM_WOODSWORD
-                    bre ~+2 r4 ITEM_WOODAXE
-                    bne ~+2 r4 ITEM_SAPLING
+                    add r6 r1 2
+                    lod r4 r6 //fuel item
+                    and r5 r4 0xF0
+                    bre ~+6 r5 ITEM_STICK
+                    bre ~+5 r5 ITEM_WOODPICKAXE
+                    bre ~+4 r5 ITEM_WOODSHOVEL
+                    bre ~+3 r5 ITEM_WOODSWORD
+                    bre ~+2 r5 ITEM_WOODAXE
+                    bne ~+2 r5 ITEM_SAPLING
                         add r3 r3 1
-                    bre ~+2 r4 ITEM_PLANK
-                    bne ~+2 r4 ITEM_LOG
+                    bre ~+2 r5 ITEM_PLANK
+                    bne ~+2 r5 ITEM_LOG
                         add r3 r3 2
-                    bne ~+2 r4 ITEM_COAL
+                    bne ~+2 r5 ITEM_COAL
                         add r3 r3 8
+                    dec r4 r4
+                    and r5 r4 0x0F
+                    bnz ~+2 r5
+                        imm r4 r4 0
+                    str r6 r4
                     jmp .bank2_endUpdateCurrentFurnace
                 .bank2_fuelTimerNotZero
                     brg ~+2 r3 0x0F
