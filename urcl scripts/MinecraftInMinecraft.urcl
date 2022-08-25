@@ -485,16 +485,11 @@ lstr inventory 4 0xFF
                         imm r2 0b01_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        subv r3 r3 2
-                        ble ~+3 r3 12
-                            or r2 r2 0b00_10_0000 //TODO: still need to check if these direction values are correct. That will be possible after rendering is implemented.
-                            jmp .endGetChestDirection
-                        ble ~+3 r3 8
-                            or r2 r2 0b00_01_0000
-                            jmp .endGetChestDirection
-                        ble ~+2 r3 4
-                            or r2 r2 0b00_11_0000
-                        .endGetChestDirection
+                        subv r3 r3 10  // TODO: check this is correct
+                        bsr r3 r3 2
+                        bsl r3 r3 4
+                        or r2 r2 r3
+    
                         pop r3 //y pos
                         or r2 r2 r3
                         str r1 r2
@@ -522,16 +517,11 @@ lstr inventory 4 0xFF
                         imm r2 0b10_000000
                         lod r3 rot
                         and r3 r3 0x0F //yaw
-                        subv r3 r3 2
-                        ble ~+3 r3 12
-                            or r2 r2 0b00_10_0000 //TODO: still need to check if these direction values are correct. That will be possible after rendering is implemented.
-                            jmp .endGetFurnaceDirection
-                        ble ~+3 r3 8
-                            or r2 r2 0b00_01_0000
-                            jmp .endGetFurnaceDirection
-                        ble ~+2 r3 4
-                            or r2 r2 0b00_11_0000
-                        .endGetFurnaceDirection
+                        subv r3 r3 10  // TODO: check this is correct
+                        bsr r3 r3 2
+                        bsl r3 r3 4
+                        or r2 r2 r3
+
                         pop r3 //y pos
                         or r2 r2 r3
                         str r1 r2
@@ -1196,7 +1186,36 @@ lstr inventory 4 0xFF
         
             in r0 %meshgen_renderscene
 
-            //TODO: render chest and furnace faces
+            imm r1 blockEntities
+            .renderBlockEntityFaceLoop
+                lod r2 r1
+                brz .renderBlockEntityFaceLoopContinue r2
+                    and r3 r2 0x0F
+                    out %meshgen_blocky r3  // get position
+                    inc r1 r1
+                    lod r3 r1
+                    dec r1 r1
+                    out %meshgen_blockxz r3
+
+                    imm r4 0x13  // furnace front texture
+                    bsr r3 r2 6  // make face smaller if chest
+                    and r3 r3 1
+                    out %meshgen_settings r3
+                    bsr r3 r2 4  // get direction
+                    and r3 r3 3
+                    out %meshgen_direction r3
+                    brz ~+2 r3
+                        add r4 r4 4  // chest front texture
+                    out %amogus_tex r4
+                    out %amogus_settings r0
+                    in r0 %meshgen_renderface
+
+                .renderBlockEntityFaceLoopContinue
+                and r2 r2 0b01_000000
+                brz ~+2 r2
+                    add r1 r1 6
+                add r1 r1 6
+            brl .renderBlockEntityFaceLoop r1 endBlockEntities
 
             //render target highlight
                 cal .rayCast
