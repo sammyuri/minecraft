@@ -348,6 +348,7 @@ lstr inventory 4 0xFD
                             cal .createEntity
                     //jmp .endDropItem
                 .endDropItem
+                //TODO: if broken block is a block entity, remove it from the block entities list
                 bsr r7 r3 4
                 out %blockram_x r7
                 and r7 r3 0x0f
@@ -434,10 +435,94 @@ lstr inventory 4 0xFD
                     jmp .endBreakAndPlace
                 .endCheckIfIntersectPlayer
                 
+                psh r1 //save xz
+                psh r2 //save y
+                    bne .endCreateChestEntity r6 BLOCK_CHEST
+                        //search for a large enough empty location in the block entity array //OPTIM: a lot of this code is repeated for chests and furnaces. It would be possible to cut back on repeated code.
+                        imm r1 blockEntities
+                        .findSpaceForChestLoop
+                            lod r2 r1
+                            bnz ~+6 r2
+                                add r2 r1 6
+                                bge .endBreakAndPlace r2 endBlockEntities //if r2 is outside of the array, no space found
+                                lod r2 r2
+                                brz .foundSpaceForChest r2
+                                add r1 r1 6
+                            add r1 r1 6
+                        brl .findSpaceForChestLoop r1 endBlockEntities
+                        //no space for chest found
+                            jmp .endBreakAndPlace //just do nothing
+                        .foundSpaceForChest
+                        imm r2 0b01_000000
+                        lod r3 rot
+                        and r3 r3 0x0F //yaw
+                        subv r3 r3 2
+                        ble ~+3 r3 12
+                            or r2 r2 0b00_10_0000 //TODO: still need to check if these direction values are correct. That will be possible after rendering is implemented.
+                            jmp .endGetChestDirection
+                        ble ~+3 r3 8
+                            or r2 r2 0b00_01_0000
+                            jmp .endGetChestDirection
+                        ble ~+2 r3 4
+                            or r2 r2 0b00_11_0000
+                        .endGetChestDirection
+                        pop r3 //y pos
+                        or r2 r2 r3
+                        str r1 r2
+                        inc r1 r1
+                        pop r2 //xz pos
+                        str r1 r2
+                            mov r2 r0 //loop 10 times to clear anny residual memory cells in the chest
+                                inc r1 r1
+                                str r1 r0
+                            inc r2
+                            ble ~-3 r2 10
+                        jmp .placeBlock
+                    .endCreateChestEntity
+                    bne .endCreateFurnaceEntity r6 BLOCK_FURNACE
+                        //search for a large enough empty location in the block entity array
+                        imm r1 blockEntities
+                        .findSpaceForFurnaceLoop
+                            lod r2 r1
+                            brz .foundSpaceForFurnace r2
+                            add r1 r1 6
+                        brl .findSpaceForFurnaceLoop r1 endBlockEntities
+                        //no space for furnace found
+                            jmp .endBreakAndPlace //just do nothing
+                        .foundSpaceForFurnace
+                        imm r2 0b10_000000
+                        lod r3 rot
+                        and r3 r3 0x0F //yaw
+                        subv r3 r3 2
+                        ble ~+3 r3 12
+                            or r2 r2 0b00_10_0000 //TODO: still need to check if these direction values are correct. That will be possible after rendering is implemented.
+                            jmp .endGetFurnaceDirection
+                        ble ~+3 r3 8
+                            or r2 r2 0b00_01_0000
+                            jmp .endGetFurnaceDirection
+                        ble ~+2 r3 4
+                            or r2 r2 0b00_11_0000
+                        .endGetFurnaceDirection
+                        pop r3 //y pos
+                        or r2 r2 r3
+                        str r1 r2
+                        inc r1 r1
+                        pop r2 //xz pos
+                        str r1 r2
+                            mov r2 r0 //loop 4 times to clear anny residual memory cells in the furnace
+                                inc r1 r1
+                                str r1 r0
+                            inc r2
+                            ble ~-3 r2 4
+                        jmp .placeBlock
+                    .endCreateFurnaceEntity
+                pop r0
+                pop r0
                 bne .placeBlock r6 BLOCK_SAND
                     dec r3 r2
                     out %blockram_y r3
                     in r3 %blockram_id
+                    out %blockram_y r2
                     bnz .placeBlock r3
                     mov r3 r1
                     mov r4 r2
@@ -855,6 +940,15 @@ lstr inventory 4 0xFD
             //if furnace
                 //progress timers
                 //apply recipe
+    
+    //TODO: do random ticks
+        //select random block (maybe include out-of-bounds blocks to reduce chance of selecting an actual block each tick)?
+            //if dirt
+                //if block above is transparent and there is an adjacent grass, become grass
+            //if grass
+                //if block above is not transparent become dirt
+            //if sapling
+                //grow tree
 
     //do rendering stuff
         //check if full render is necessary
@@ -986,7 +1080,7 @@ jmp .mainLoop
             cal .drawHotbar
             in r0 %screen_buffer
 
-            imm r1, 255
+            imm r1 255
             .suffocationDelayLoop
                 add r1 r1 -1
                 nop
