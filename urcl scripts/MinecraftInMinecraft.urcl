@@ -306,7 +306,7 @@ lstr inventory 4 0xFE
                         imm r2 0
                         .blockBreakAnimDelayLoop //this loop lasts shorter the higher breakstrength is
                             add r2 r2 r7
-                            out %wait 50 //replace this code on CHUNGUS with any slow code. r1 should currently be free
+                            out %wait 50 //TEMP: in CHUNGUS replace this code with any slow code. r1 should currently be free
                             in r0 %wait 
                         ble .blockBreakAnimDelayLoop r2 BREAKTIME
                         in r0 %amogus_drawtoscreen
@@ -895,7 +895,8 @@ lstr inventory 4 0xFE
                     psh r1 //preserve r1 through function call
                         cal .bank1_addItemToInventory
                     pop r1
-                    str r1 0 //delete item entity
+                    bnz ~+2 r7 //if slot not found, don't delete item entity.
+                        str r1 0 //delete item entity
                 .endPickUpItem
                 //apply gravity
                     lod r2 r1
@@ -2262,6 +2263,7 @@ ret
 
 .bank1_addItemToInventory
     // input: r7 (item)
+    // output: r7 (1 if slot not found, 0 otherwise)
     // other registers not necessarily preserved
     imm r1 0
     and r6 r7 0xF0  // item id
@@ -2277,6 +2279,7 @@ ret
             bge .bank1_addItemToInventoryStackStackTooBig r5 16  // skip if stack too big
                 add r3 r3 r5
                 str r1 r3  // store new, bigger stack
+                mov r7 r0
                 ret  // done
             .bank1_addItemToInventoryStackStackTooBig
             or r2 r2 15
@@ -2295,6 +2298,7 @@ ret
         lod r2 r1
         bnz ~+3 r2  // no item
             str r1 r7  // store regardless of what it is
+            mov r7 r0
             ret  // done
         bge .bank1_addItemToInventoryLoopContinue r7 0xF0  // skip if nonstackable
         and r3 r2 0xF0  // get item id
@@ -2305,6 +2309,7 @@ ret
             bge .bank1_addItemToInventoryStackTooBig r5 16  // skip if stack too big
                 add r3 r3 r5
                 str r1 r3  // store new, bigger stack
+                mov r7 r0
                 ret  // done
             .bank1_addItemToInventoryStackTooBig
             or r2 r2 15
@@ -2315,6 +2320,7 @@ ret
         sub r1 r1 inventory
         add r1 r1 1  // continue and check if done
     brl .bank1_addItemToInventoryLoop r1 15
+    imm r7 1
 ret
 
 
@@ -2706,6 +2712,7 @@ ret
 
 .bank2_addItemToInventory
     // input: r7 (item)
+    // output: r7 (1 if no slot found, 0 otherwise)
     // other registers not necessarily preserved
     imm r1 0
     and r6 r7 0xF0  // item id
@@ -2721,6 +2728,7 @@ ret
             bge .bank2_addItemToInventoryStackStackTooBig r5 16  // skip if stack too big
                 add r3 r3 r5
                 str r1 r3  // store new, bigger stack
+                mov r7 r0
                 ret  // done
             .bank2_addItemToInventoryStackStackTooBig
             or r2 r2 15
@@ -2739,6 +2747,7 @@ ret
         lod r2 r1
         bnz ~+3 r2  // no item
             str r1 r7  // store regardless of what it is
+            mov r7 r0
             ret  // done
         bge .bank2_addItemToInventoryLoopContinue r7 0xF0  // skip if nonstackable
         and r3 r2 0xF0  // get item id
@@ -2749,6 +2758,7 @@ ret
             bge .bank2_addItemToInventoryStackTooBig r5 16  // skip if stack too big
                 add r3 r3 r5
                 str r1 r3  // store new, bigger stack
+                mov r7 r0
                 ret  // done
             .bank2_addItemToInventoryStackTooBig
             or r2 r2 15
@@ -2759,6 +2769,7 @@ ret
         sub r1 r1 inventory
         add r1 r1 1  // continue and check if done
     brl .bank2_addItemToInventoryLoop r1 15
+    imm r7 1
 ret
 
 
@@ -2808,11 +2819,13 @@ ret
         lod r7 craftingOutput  // add crafting output to inventory
         cal .bank2_addItemToInventory
 
+        brz .bank2_tryCraftingFailure r7
+
         imm r1 15  // pop the (garbage) inventory off the stack
         .bank2_tryCraftingClearStackLoop
             pop r0
             sub r1 r1 1
-            bnz .bank2_tryCraftingClearStackLoop r1
+        bnz .bank2_tryCraftingClearStackLoop r1
 
         str permanentSelectedSlot 0xFF  // reset permanent selected slot if successful
         cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
@@ -2826,8 +2839,8 @@ ret
             pop r3
             str r2 r3
             sub r2 r2 1
-            bge .bank2_tryCraftingFromStackLoop r2 inventory
-        ret
+        bge .bank2_tryCraftingFromStackLoop r2 inventory
+    ret
 
 
 
@@ -2949,6 +2962,8 @@ ret
     in r0 %screen_buffer
 
 .bank2_inventoryLoop
+    out %wait 50 //TEMP
+    in r0 %wait
     out %playerinput r0 //synchronize playerInput device
 
     //handle inputs
@@ -3236,6 +3251,8 @@ ret
     in r0 %screen_buffer
 
 .bank2_craftingLoop
+    out %wait 50 //TEMP
+    in r0 %wait
     out %playerinput r0 //synchronize playerInput device
 
     //handle inputs
@@ -3531,6 +3548,8 @@ ret
     in r0 %screen_buffer
 
 .bank2_furnaceLoop
+    out %wait 50 //TEMP
+    in r0 %wait
     out %playerinput r0 //synchronize playerInput device
 
     //handle inputs
@@ -3607,8 +3626,13 @@ ret
                 lod r1 loadedTileEntity
                 add r1 r1 4
                 lod r7 r1
-                str r1 r0  // delete from furnace
-                cal .bank2_addItemToInventory
+                psh r7
+                    psh r1
+                        cal .bank2_addItemToInventory
+                    pop r1
+                    bnz ~+2 r7
+                        str r1 r0  // delete from furnace
+                pop r7
                 lod r7 inventorySlot  // redraw inventory slot (incase modified)
                 cal .bank2_furnaceDrawSlotWithHighlight
                 cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
@@ -3841,6 +3865,8 @@ ret
     in r0 %screen_buffer
 
 .bank2_chestLoop
+    out %wait 50 //TEMP
+    in r0 %wait
     out %playerinput r0 //synchronize playerInput device
 
     //handle inputs
