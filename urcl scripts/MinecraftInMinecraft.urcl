@@ -29,7 +29,7 @@ minstack 23
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
         @define RANDOMTICKSPEED 10 //TEMP: 10 is too high. At this speed each block has 1/51 chance of being ticked every frame
-        @define SMELTTIME 0x1600
+        @define SMELTTIME 0xC0  // this was set to something ridiculous?
     //other constants
         @define BOTTOMOFSTACK 255 //in URCX: minreg + minheap. in CHUNGUS: 0
     //block IDs
@@ -109,7 +109,7 @@ minstack 23
         @define TEXTURE_NONSTACKABLE 0x50
         @define TEXTURE_GUI_EMPTY 0x61
         @define TEXTURE_GUI_ARROW 0x63
-        @define TEXTURE_GUI_SMELTING 0x67
+        @define TEXTURE_GUI_SMELTING 0x65
         @define TEXTURE_INVENTORY 0x70
         @define TEXTURE_CRAFT 0x75
         @define TEXTURE_FURNACE 0x78
@@ -194,7 +194,6 @@ lstr inventory 1 0x55
 lstr inventory 2 0x89
 lstr inventory 3 0xFE
 lstr inventory 4 0xFE
-
 
 .mainLoop
     out %playerinput r0 //synchronize playerInput device
@@ -968,7 +967,6 @@ lstr inventory 4 0xFE
             add r1 r1 3
         brl .updateItemEntitiesLoop r1 blockEntities
 
-    //TODO: test to see if updating all the furnaces properly works
     //NOTE: furnace format as follows
         //byte 0: II_DD_YYYY
         //byte 1: XXXX_ZZZZ
@@ -980,7 +978,7 @@ lstr inventory 4 0xFE
     imm r1 blockEntities //r1 = pointer
     .updateFurnaceLoop
         lod r2 r1
-        brn .notFurnace r2
+        brl .notFurnace r2 0x80
             //pseudocode
                 //decrement timers. If smelt timer wasn't at zero, try crafting
                     //get recipe result
@@ -1022,7 +1020,10 @@ lstr inventory 4 0xFE
                     and r4 r4 0x0F
                     add r5 r1 4
                     lod r6 r5
-                    addv r4 r4 r6
+                    brz ~+3 r6  // if zero, load entire item rather than amount
+                        addv r4 r4 r6
+                    jmp ~+2
+                        in r4 %craftrom
                     str r5 r4
                     add r4 r1 3
                     lod r5 r4
@@ -1031,10 +1032,14 @@ lstr inventory 4 0xFE
                     bnz ~+2 r6
                         mov r5 r0
                     str r4 r5
+
+                    add r4 r1 3  // if no items remain, invalidate recipe
+                    lod r4 r4
+                    brz .bank2_endUpdateCurrentFurnace r4
             .endSmeltTimer
             brz .endUpdateCurrentFurnace r7
                 and r4 r3 0x0F //fuel timer
-                brz .fuelTimerNotZero r4
+                bnz .fuelTimerNotZero r4
                     add r6 r1 2
                     lod r4 r6 //fuel item
                     and r5 r4 0xF0
@@ -3459,8 +3464,17 @@ ret
     add r1 r1 1
     out %screen_texid_drawinvtex r1
 
-    // TODO: fill in based on timer value
+    lod r1 loadedTileEntity
+    add r1 r1 5
+    lod r1 r1  // timer
+    bsr r1 r1 4  // smelt timer
 
+    brz ~+6 r1  // if not smelting, don't obscure arrow
+        out %screen_x2 55
+        out %screen_y2 19
+        sub r1 55 r1  // progress
+        out %screen_x1 r1
+        in r0 %screen_drawrect
 ret
 
 
@@ -3564,7 +3578,17 @@ ret
             lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
             cal .bank2_furnaceDrawSlotWithHighlight
 
-            in r0 %playerinput  // garbage
+            in r1 %playerinput  // take furnace output
+            brz ~+9 r1
+                lod r1 loadedTileEntity
+                add r1 r1 4
+                lod r7 r1
+                str r1 r0  // delete from furnace
+                cal .bank2_addItemToInventory
+                lod r7 inventorySlot  // redraw inventory slot (incase modified)
+                cal .bank2_furnaceDrawSlotWithHighlight
+                cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
+
             in r1 %playerinput  // select item?
             brz .bank2_furnaceSkipSelectItem r1  // skip if not necessary
 
@@ -3601,7 +3625,6 @@ ret
         
         .bank2_furnaceSkipSelectItem
 
-        //TODO: test to see if updating all the furnaces properly works
         //NOTE: furnace format as follows
             //byte 0: II_DD_YYYY
             //byte 1: XXXX_ZZZZ
@@ -3613,7 +3636,7 @@ ret
         imm r1 blockEntities //r1 = pointer
         .bank2_updateFurnaceLoop
             lod r2 r1
-            brn .bank2_notFurnace r2
+            brl .bank2_notFurnace r2 0x80
                 //pseudocode
                     //decrement timers. If smelt timer wasn't at zero, try crafting
                         //get recipe result
@@ -3655,7 +3678,10 @@ ret
                         and r4 r4 0x0F
                         add r5 r1 4
                         lod r6 r5
-                        addv r4 r4 r6
+                        brz ~+3 r6  // if zero, load entire item rather than amount
+                            addv r4 r4 r6
+                        jmp ~+2
+                            in r4 %craftrom
                         str r5 r4
                         add r4 r1 3
                         lod r5 r4
@@ -3664,10 +3690,14 @@ ret
                         bnz ~+2 r6
                             mov r5 r0
                         str r4 r5
+
+                        add r4 r1 3  // if no items remain, invalidate recipe
+                        lod r4 r4
+                        brz .bank2_endUpdateCurrentFurnace r4
                 .bank2_endSmeltTimer
                 brz .bank2_endUpdateCurrentFurnace r7
                     and r4 r3 0x0F //fuel timer
-                    brz .bank2_fuelTimerNotZero r4
+                    bnz .bank2_fuelTimerNotZero r4
                         add r6 r1 2
                         lod r4 r6 //fuel item
                         and r5 r4 0xF0
@@ -3704,9 +3734,6 @@ ret
             .bank2_updateFurnaceLoopNext
             add r1 r1 6
         brl .bank2_updateFurnaceLoop r1 endBlockEntities
-
-            in r1 %playerinput  // if nonzero, take from furnace
-            brz ~+1 r1
 
             cal .bank2_drawFurnaceContents  // redraws furnace contents incase modified
 

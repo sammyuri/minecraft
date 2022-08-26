@@ -6,6 +6,7 @@ export class CraftingRom {
             ["4"]: Result.stone,
             ["5"]: Result.coal,
             ["9"]: Result.ironIngot,
+            ["A"]: Result.glass,
             //crafting recipes
             ["770770000"]: Result.table,
             ["500000000"]: Result.plank,
@@ -57,8 +58,10 @@ export class CraftingRom {
                 }
                 else {
                     this.currentRecipe = this.currentRecipe.toLocaleUpperCase();
-                    if (this.currentRecipe in this.recipes) {
-                        return this.recipes[this.currentRecipe];
+                    console.log(this.currentRecipe[8]);
+                    if (this.currentRecipe[8] in this.recipes) {
+                        console.log(this.recipes[this.currentRecipe[8]])
+                        return this.recipes[this.currentRecipe[8]];
                     }
                     else {
                         return 0;
@@ -129,4 +132,5 @@ var Result;
     Result[Result["ironShovel"] = 250] = "ironShovel";
     Result[Result["ironSword"] = 251] = "ironSword";
     Result[Result["shears"] = 252] = "shears";
+    Result[Result["glass"] = 177] = "glass";
 })(Result || (Result = {}));
