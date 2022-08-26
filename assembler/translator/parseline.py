@@ -43,6 +43,8 @@ def parse_immediate(immediate: str, length: int) -> str:
     if immediate[0] == '"':
         return get_binary(ord(immediate[1].replace("@", " ")), length)
 
+    immediate = "".join([i for i in immediate if i != "_"])
+
     # Remove prefix e.g. "M10" (for memory address 10) -> "10"
     if not immediate[0] in "-0123456789":
         prefix = immediate[0]

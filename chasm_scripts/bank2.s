@@ -1,11 +1,119 @@
 .BANK:
-
-jmp .bank2_loadInventoryGUI
-
+jmp .bank2_loadChestGUI
 
 
 
-.PAGE
+.goFromOpenInventory
+    jmp .bank2_loadInventoryGUI
+.goFromOpenCrafting
+    jmp .bank2_loadCraftingGUI
+.goFromOpenFurnace
+    jmp .bank2_loadFurnaceGUI
+.goFromOpenChest
+    jmp .bank2_loadChestGUI
+
+.bank2_craftingDrawSlotWithHighlight
+    cal .bank2_inventoryGetSlot
+    cmp r6, 0xFF
+    brt nequal, ~+2
+        ret
+    poi r7
+    mld r3, 0
+    mov r1, r5
+    mov r2, r6
+    cmp r6, 28
+    brt grtreq, ~+4
+        cal .bank2_drawItemInGrid
+        cal .bank2_drawHighlight
+        ret
+    lim r4, 0
+    cal .bank2_drawItem
+ret
+
+.bank2_craftingMoveWithinInventory_2
+    cmp r1, 0x10
+    brt nzero, ~+6
+        cmp r2, 0x20
+        brt less, ~+3
+            lim r2, 0x70
+            jmp ~+2
+        add r2, r2, r1
+    cmp r1, 0xF0
+    brt nzero, ~+7
+        cmp r2, 0x10
+        brt grtreq, ~+4
+            lim r0, 0x20
+            add r2, r2, r0
+            jmp ~+2
+        add r2, r2, r1
+    cmp r1, 0x0F
+    brt nzero, ~+8
+        mov r3, r2
+        aim r3, 0x0F
+        cmp r3, 0
+        brt nzero, ~+3
+            adi r2, r2, 4
+            jmp ~+2
+        adi r2, r2, -1
+    cmp r1, 0x01
+    brt nzero, ~+8
+        mov r3, r2
+        aim r3, 0x0F
+        cmp r3, 4
+        brt nzero, ~+3
+            adi r2, r2, -4
+            jmp ~+2
+        adi r2, r2, 1
+ret
+
+
+
+
+
+
+
+.PAGE:
+.bank2_addItemToInventory
+    pld r0, %switchbanks
+    jmp .addItemToInventoryFromBank2
+    .bank2_addItemToInventoryReturn
+ret
+
+.bank2_updateAllFurnaces
+    pld r0, %switchbanks
+    jmp .furnaceLoopFromBank2
+    .bank2_updateAllFurnacesReturn
+ret
+
+
+.bank2_craftingFinishLoop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+
+    pld r1, %playerinput
+    brt zero, .bank2_craftingContinue
+        cal .bank2_reset3x3CraftingGrid
+        mld r7, inventorySlot
+        cal .bank2_craftingDrawSlotWithHighlight
+
+    .bank2_craftingContinue
+    pld r0, %screen_buffer
+jmp .bank2_craftingLoop
+
+
+
+
+
+
+.PAGE:
 .bank2_multiplyXAndYBy11
     add r7, r7, r5  // adjust memory address by x
     lim r0, 11  // multiply
@@ -79,6 +187,8 @@ ret
 
 
 
+
+
 .PAGE:
 .bank2_inventoryGetSlot_2
     cmp r7, 0xA0  // within large crafting grid
@@ -104,6 +214,44 @@ ret
     // TODO: furnace
 
     lim r6, 0xFF  // out of bounds
+ret
+
+.bank2_inventoryFinishLoop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+    pld r0, %playerinput
+    nop
+
+    pld r1, %playerinput
+    brt zero, .bank2_inventoryContinue
+        cal .bank2_reset2x2CraftingGrid
+        mld r7, inventorySlot
+        cal .bank2_inventoryDrawSlotWithHighlight
+
+    .bank2_inventoryContinue
+    pld r0, %screen_buffer
+jmp .bank2_inventoryLoop
+
+.bank2_furnaceShowProgress
+    mld r1, loadedTileEntity
+    poi r1
+    mld r1, 5
+    bsri r1, r1, 4
+    brt zero, ~+9
+        lim r0, 55
+        pst r0, %screen_x2
+        lim r0, 19
+        pst r0, %screen_y2
+        lim r0, 55
+        sub r1, r0, r1
+        pst r1, %screen_x1
+        pld r0, %screen_drawrect
 ret
 
 
@@ -151,13 +299,13 @@ ret
     brt grtreq, .bank2_drawItemNonstackable
         // draw stackable item
         bsri r4, r3, 4
-        lim r0, STACKABLE_TEXTURE
+        lim r0, TEXTURE_STACKABLE
         add r4, r4, r0
         pst r4, %screen_texid_drawtex
 
         // draw item count
         aim r3, 0x0F
-        lim r0, NUMBER
+        lim r0, TEXTURE_NUMBER
         add r3, r3, r0
         adi r1, r1, 2
         adi r2, r2, 2
@@ -175,7 +323,7 @@ ret
     .bank2_drawItemNonstackable
         // draw nonstackable item
         aim r3, 0x0F
-        lim r0, NONSTACKABLE_TEXTURE
+        lim r0, TEXTURE_NONSTACKABLE
         add r3, r3, r0
         pst r3, %screen_texid_drawtex
         jmp .bank2_drawItemReturn
@@ -251,7 +399,20 @@ ret
     nop
 ret
 
+.randomTickLeaves
+    pst r0, %blockram_id
 
+    psh r5
+    mov r4, r2
+    bsli r2, r1, 4
+    or r3, r3, r2
+
+    pld r0, %switchbanks
+    cal .bank1_dropItemFromLeaves
+
+    lim r0, 255
+    mst r0, needReRender
+jmp .randomTickLoopContinue
 
 
 
@@ -277,7 +438,7 @@ ret
     cmp r3, 0
     brt nzero, .bank2_drawItemInGridNonZero
 
-        lim r0, GUI_EMPTY
+        lim r0, TEXTURE_GUI_EMPTY
         pst r0, %screen_texid_drawtex
         .bank2_drawItemInGridReturn
         adi r1, r1, -1
@@ -290,7 +451,7 @@ ret
     brt grtreq, .bank2_drawItemNonstackable
         // draw stackable item
         bsri r3, r3, 4
-        lim r0, STACKABLE_TEXTURE
+        lim r0, TEXTURE_STACKABLE
         add r3, r3, r0
         pst r3, %screen_texid_drawtex
         jmp .bank2_drawItemInGridReturn
@@ -298,7 +459,7 @@ ret
     .bank2_drawItemInGridNonstackable
         // draw nonstackable item
         aim r3, 0x0F
-        lim r0, NONSTACKABLE_TEXTURE
+        lim r0, TEXTURE_NONSTACKABLE
         add r3, r3, r0
         pst r3, %screen_texid_drawtex
         jmp .bank2_drawItemInGridReturn
@@ -381,53 +542,6 @@ ret
     cal .bank2_drawGUIRow
 ret
 
-
-
-
-
-
-.PAGE:
-.bank2_addItemToInventory
-    lim r1, 0
-    mov r6, r7
-    aim r6, 0xF0
-    .bank2_addItemToInventoryLoop
-        poi r1
-        mld r2, inventory
-        brt nzero, ~+4
-            poi r1
-            mst r7, inventory
-            ret
-        cmp r7, 0xF0
-        brn grtreq, .bank2_addItemToInventoryLoopContinue
-        mov r3, r2
-        aim r3, 0xF0
-        sub r0, r6, r3
-        brt nzero, .bank2_addItemToInventoryLoopContinue
-        mov r4, r2
-        aim r4, 0x0F
-        mov r5, r7
-        aim r5, 0x0F
-        add r5, r4, r5
-        cmp r5, 16
-        brt grtreq, .bank2_addItemToInventoryStackTooBig
-        add r3, r3, r5
-        poi r1
-        mst r3, inventory
-        ret
-        .bank2_addItemToInventoryStackTooBig
-        lim r0, 15
-        or r2, r2, r0
-        poi r1
-        mst r2, inventory
-        adi r5, r5, -15
-        add r7, r6, r5
-        .bank2_addItemToInventoryLoopContinue
-        adi r1, r1, 1
-        cmp r1, 15
-        brt less, .bank2_addItemToInventoryLoop
-    ret
-// end
 
 
 
@@ -677,7 +791,7 @@ ret
     pst r0, %screen_x1
     lim r0, 15
     pst r0, %screen_y1
-    lim r1, GUI_ARROW
+    lim r1, TEXTURE_GUI_ARROW
     pst r1, %screen_texid_drawinvtex
     lim r0, 54
     pst r0, %screen_x1
@@ -838,108 +952,13 @@ ret
     
     .bank2_inventorySkipSelectItem
     jmp .bank2_inventoryFinishLoop
-
-
-
-
-
-
-.PAGE:
-.bank2_inventoryFinishLoop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-
-    pld r1, %playerinput
-    brt zero, .bank2_inventoryContinue
-        cal .bank2_reset2x2CraftingGrid
-        mld r7, inventorySlot
-        cal .bank2_inventoryDrawSlotWithHighlight
-
-    .bank2_inventoryContinue
-    pld r0, %screen_buffer
-jmp .bank2_inventoryLoop
-
-
-
-
-
-
+// NOTE: this jumps to a way earlier spot, to save page space
 
 
 
 
 
 // CRAFTING INVENTORY (3x3 crafting grid)
-
-
-
-
-
-
-
-.PAGE:
-.bank2_craftingDrawSlotWithHighlight
-    cal .bank2_inventoryGetSlot
-    cmp r6, 0xFF
-    brt nequal, ~+2
-        ret
-    poi r7
-    mld r3, 0
-    mov r1, r5
-    mov r2, r6
-    cmp r6, 28
-    brt grtreq, ~+4
-        cal .bank2_drawItemInGrid
-        cal .bank2_drawHighlight
-        ret
-    lim r4, 0
-    cal .bank2_drawItem
-ret
-
-.bank2_craftingMoveWithinInventory_2
-    cmp r1, 0x10
-    brt nzero, ~+6
-        cmp r2, 0x20
-        brt less, ~+3
-            lim r2, 0x70
-            jmp ~+2
-        add r2, r2, r1
-    cmp r1, 0xF0
-    brt nzero, ~+7
-        cmp r2, 0x10
-        brt grtreq, ~+4
-            lim r0, 0x20
-            add r2, r2, r0
-            jmp ~+2
-        add r2, r2, r1
-    cmp r1, 0x0F
-    brt nzero, ~+8
-        mov r3, r2
-        aim r3, 0x0F
-        cmp r3, 0
-        brt nzero, ~+3
-            adi r2, r2, 4
-            jmp ~+2
-        adi r2, r2, -1
-    cmp r1, 0x01
-    brt nzero, ~+8
-        mov r3, r2
-        aim r3, 0x0F
-        cmp r3, 4
-        brt nzero, ~+3
-            adi r2, r2, -4
-            jmp ~+2
-        adi r2, r2, 1
-ret
-
 
 
 
@@ -1039,7 +1058,7 @@ ret
     pst r0, %screen_x1
     lim r0, 11
     pst r0, %screen_y1
-    lim r1, GUI_ARROW
+    lim r1, TEXTURE_GUI_ARROW
     pst r1, %screen_texid_drawinvtex
     lim r0, 59
     pst r0, %screen_x1
@@ -1059,6 +1078,26 @@ ret
         pld r0, %switchbanks
         jmp .continueFromClosingInventory
     jmp .bank2_craftingHandleMovement
+
+// in a bit of a weird place to save page space
+.bank2_furnaceDrawSlotWithoutHighlight
+    cal .bank2_inventoryGetSlot
+    cmp r6, 0xFF
+    brt nequal, ~+2
+        ret
+    poi r7
+    mld r3, 0
+    mov r1, r5
+    mov r2, r6
+    cmp r6, 28
+    brt grtreq, ~+4
+        cal .bank2_drawItemInGrid
+        cal .bank2_clearHighlight
+        ret
+    lim r4, 1
+    cal .bank2_drawItem
+ret
+
 
 
 
@@ -1210,34 +1249,8 @@ ret
     
     .bank2_craftingSkipSelectItem
     jmp .bank2_craftingFinishLoop
+// NOTE: this jumps to a way earlier spot, to save page space
 
-
-
-
-
-
-.PAGE:
-.bank2_craftingFinishLoop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-    pld r0, %playerinput
-    nop
-
-    pld r1, %playerinput
-    brt zero, .bank2_craftingContinue
-        cal .bank2_reset3x3CraftingGrid
-        mld r7, inventorySlot
-        cal .bank2_craftingDrawSlotWithHighlight
-
-    .bank2_craftingContinue
-    pld r0, %screen_buffer
-jmp .bank2_craftingLoop
 
 
 
@@ -1248,4 +1261,819 @@ jmp .bank2_craftingLoop
 
 
 
+
+.PAGE:
+.bank2_furnaceDrawSlotWithHighlight
+    cal .bank2_inventoryGetSlot
+    cmp r6, 0xFF
+    brt nequal, ~+2
+        ret
+    poi r7
+    mld r3, 0
+    mov r1, r5
+    mov r2, r6
+    cmp r6, 28
+    brt grtreq, ~+4
+        cal .bank2_drawItemInGrid
+        cal .bank2_drawHighlight
+        ret
+    lim r4, 0
+    cal .bank2_drawItem
+ret
+
+.bank2_drawFurnaceContents
+    // draw 3 slots in furnace
+        mld r6, loadedTileEntity
+        adi r6, r6, 2
+        lim r1, 30
+        lim r2, 19
+        lim r5, 1
+        mld r7, inventorySlot
+        lim r0, 0xA0
+        sub r7, r7, r0
+        cal .bank2_drawGUIRow
+        
+        lim r1, 30
+        lim r2, 1
+        lim r5, 1
+        mld r7, inventorySlot
+        lim r0, 0xB0
+        sub r7, r7, r0
+        cal .bank2_drawGUIRow
+
+        lim r1, 56
+        lim r2, 10
+        lim r5, 1
+        lim r7, 128
+        cal .bank2_drawGUIRow
+
+    // draw arrow
+        lim r0, 42
+        pst r0, %screen_x1
+        lim r0, 11
+        pst r0, %screen_y1
+        lim r1, TEXTURE_GUI_ARROW
+        pst r1, %screen_texid_drawinvtex
+        lim r0, 50
+        pst r0, %screen_x1
+        adi r1, r1, 1
+        pst r1, %screen_texid_drawinvtex
+        pld r0, %screen_nop
+
+    cal .bank2_furnaceShowProgress
+
+ret
+
+
+
+
+
+
+.PAGE:
+.bank2_loadFurnaceGUI
+    cal .bank2_drawInventory
+
+    cal .bank2_drawFurnaceContents
+
+    lim r0, 31
+    pst r0, %screen_x1
+    lim r0, 12
+    pst r0, %screen_y1
+    lim r0, TEXTURE_GUI_SMELTING
+    pst r0, %screen_texid_drawinvtex
+
+    lim r0, 1
+    pst r0, %screen_y1
+
+    lim r0, 48
+    pst r0, %screen_x1
+    lim r0, 0x78
+    pst r0, %screen_texid_drawinvtex
+
+    lim r0, 56
+    pst r0, %screen_x1
+    lim r0, 0x79
+    pst r0, %screen_texid_drawinvtex
+
+    lim r0, 64
+    pst r0, %screen_x1
+    lim r0, 0x7A
+    pst r0, %screen_texid_drawinvtex
+
+    lim r0, 72
+    pst r0, %screen_x1
+    lim r0, 0x7B
+    pst r0, %screen_texid_drawinvtex
+
+    pld r0, %screen_nop
+
+    pld r0, %screen_buffer
+jmp .bank2_furnaceLoop
+
+.bank2_furnaceMoveOutsideInventory
+    cmp r1, 0x10
+    brt nzero, ~+6
+        cmp r2, 0xB0
+        brt less, ~+3
+            lim r2, 0x00
+            jmp ~+2
+        add r2, r2, r1
+    cmp r1, 0xF0
+    brt nzero, ~+6
+        cmp r2, 0xB0
+        brt grtreq, ~+3
+            lim r2, 0x20
+            jmp ~+2
+        add r2, r2, r1
+    
+    // note: can't move left or right within furnace GUI
+    jmp .bank2_furnaceSkipMovement
+
+
+
+
+
+
+.PAGE:
+.bank2_furnaceLoop
+    pst r0, %playerinput
+
+    // handle inputs
+        pld r0, %playerinput
+        nop
+        pld r1, %playerinput
+        brt zero, ~+3
+            pld r0, %switchbanks
+            jmp .continueFromClosingInventory
+    // handle inventory movement
+        pld r1, %playerinput
+        mld r2, inventorySlot
+        cmp r1, 0
+        brt zero, .bank2_furnaceSkipMovement
+
+        mld r7, inventorySlot
+        psh r1
+        cal .bank2_furnaceDrawSlotWithoutHighlight
+        pop r1
+
+        mld r2, inventorySlot
+        cmp r2, 0x30
+        brt less, ~+2
+            jmp .bank2_furnaceMoveOutsideInventory
+        
+        // within inventory
+            cmp r1, 0x10
+            brt nzero, ~+6
+                cmp r2, 0x20
+                brt less, ~+3
+                    lim r2, 0xA0
+                    jmp ~+2
+                add r2, r2, r1
+            cmp r1, 0xF0
+            brt nzero, ~+7
+                cmp r2, 0x10
+                brt grtreq, ~+4
+                    lim r0, 0x20
+                    add r2, r2, r0
+                    jmp ~+2
+                add r2, r2, r1
+            cmp r1, 0x0F
+            brt nzero, ~+7
+                lim r0, 0x0F
+                and r3, r2, r0
+                brt nzero, ~+3
+                    adi r2, r2, 4
+                    jmp ~+2
+                adi r2, r2, -1
+            cmp r1, 0x01
+            brt nzero, ~+8
+                lim r0, 0x0F
+                and r3, r2, r0
+                cmp r3, 0x04
+                brt nzero, ~+3
+                    adi r2, r2, -4
+                    jmp ~+2
+                add r2, r2, r1
+            
+        .bank2_furnaceSkipMovement
+            jmp .bank2_furnaceSkipMovement2
+
+
+
+
+
+
+.PAGE:
+.bank2_furnaceSkipMovement2
+    mst r2, inventorySlot
+    mov r7, r2
+    cal .bank2_furnaceDrawSlotWithHighlight
+
+    mld r7, permanentSelectedSlot
+    cal .bank2_furnaceDrawSlotWithHighlight
+
+    pld r1, %playerinput
+    brt zero, ~+10
+        mld r1, loadedTileEntity
+        poi r1
+        mld r7, 4
+        poi r1
+        mst r0, 4
+        cal .bank2_addItemToInventory
+        mld r7, inventorySlot
+        cal .bank2_furnaceDrawSlotWithHighlight
+        cal .bank2_drawInventoryOnlyInventoryPart
+
+    pld r1, %playerinput  // select item?
+    brt nzero, ~+2
+        jmp .bank2_furnaceSkipSelectItem
+    mld r1, permanentSelectedSlot
+    mld r2, inventorySlot
+    cmp r1, 0xFF
+    brt zero, ~+2
+        jmp .bank2_furnaceSelectedAlready
+    mst r2, permanentSelectedSlot
+    jmp .bank2_furnaceSkipSelectItem
+            
+.bank2_furnaceSelectedAlready
+    mov r7, r1
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mld r3, 0
+    mov r7, r2
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mld r4, 0
+    poi r7
+    mst r3, 0
+    psh r4
+    mov r7, r2
+    cal .bank2_furnaceDrawSlotWithHighlight
+    pop r4
+    mld r1, permanentSelectedSlot
+    mov r7, r1
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mst r4, 0
+    mov r7, r1
+    cal .bank2_furnaceDrawSlotWithoutHighlight
+    lim r0, 0xFF
+    mst r0, permanentSelectedSlot
+    mld r7, inventorySlot
+    cal .bank2_furnaceDrawSlotWithHighlight
+    
+    .bank2_furnaceSkipSelectItem
+        cal .bank2_updateAllFurnaces
+
+        cal .bank2_drawFurnaceContents
+    
+    .bank2_furnaceContinue
+        pld r0, %screen_buffer
+jmp .bank2_furnaceLoop
+
+
+
+
+
 // CHEST GUI
+
+
+
+
+
+.PAGE:
+.bank2_chestDrawSlotFirstBit
+    cal .bank2_inventoryGetSlot
+    cmp r6, 0xFF
+    brt nequal, ~+2
+        ret
+    poi r7
+    mld r3, 0
+    mov r1, r5
+    mov r2, r6
+ret
+
+.bank2_chestDrawSlotWithHighlight
+    cal .bank2_chestDrawSlotFirstBit
+    lim r4, 0
+    cal .bank2_drawItem
+ret
+
+.bank2_chestDrawSlotWithoutHighlight
+    cal .bank2_chestDrawSlotFirstBit
+    lim r4, 1
+    cal .bank2_drawItem
+ret
+
+.bank2_loadChestGUI
+    cal .bank2_drawInventory
+
+    lim r1, 21
+    lim r2, 18
+    lim r5, 5
+    mld r6, loadedTileEntity
+    adi r6, r6, 2
+    mld r7, inventorySlot
+    lim r0, 0x30
+    sub r7, r7, r0
+    cal .bank2_drawGUIRow
+
+    adi r2, r2, -11
+    lim r1, 21
+    lim r5, 5
+    mld r7, inventorySlot
+    lim r0, 0x40
+    sub r7, r7, r0
+    cal .bank2_drawGUIRow
+
+    lim r0, 1
+    pst r0, %screen_y1
+    lim r0, 56
+    pst r0, %screen_x1
+    lim r0, 0x7C
+    pst r0, %screen_texid_drawinvtex
+    lim r0, 64
+    pst r0, %screen_x1
+    lim r0, 0x7D
+    pst r0, %screen_texid_drawinvtex
+    lim r0, 72
+    pst r0, %screen_x1
+    lim r0, 0x7E
+    pst r0, %screen_texid_drawinvtex
+
+    lim r0, 0xFF
+    mst r0, permanentSelectedSlot
+
+    pld r0, %screen_buffer
+.bank2_chestLoop
+    pst r0, %playerinput
+    nop
+    pld r1, %playerinput
+    brt zero, ~+3
+        pld r0, %switchbanks
+        jmp .continueFromClosingInventory
+    jmp .bank2_chestHandleMovement
+
+
+
+
+
+
+
+.PAGE:
+.bank2_chestHandleMovement
+    mld r2, inventorySlot
+    pld r1, %playerinput
+    brt zero, .bank2_chestSkipMovement
+
+    mld r7, inventorySlot
+    psh r1
+    cal .bank2_chestDrawSlotWithoutHighlight
+    pop r1
+
+    mld r2, inventorySlot
+    cmp r1, 0x10
+    brt nzero, ~+7
+        cmp r2, 0x40
+        brt less, ~+4
+            lim r0, 0x40
+            sub r2, r2, r0
+            jmp ~+2
+        add r2, r2, r1
+    cmp r1, 0xF0
+    brt nzero, ~+7
+        cmp r2, 0x10
+        brt grtreq, ~+4
+            lim r0, 0x40
+            add r2, r2, r0
+            jmp ~+2
+        add r2, r2, r1
+    cmp r1, 0x0F
+    brt nzero, ~+8
+        mov r3, r2
+        aim r3, 0x0F
+        cmp r3, 0x00
+        brt nzero, ~+3
+            adi r2, r2, 4
+            jmp ~+2
+        adi r2, r2, -1
+    cmp r1, 0x01
+    brt nzero, ~+8
+        mov r3, r2
+        aim r3, 0x0F
+        cmp r3, 0x04
+        brt nzero, ~+3
+            adi r2, r2, -4
+            jmp ~+2
+        adi r2, r2, 1
+
+    .bank2_chestSkipMovement
+        mst r2, inventorySlot
+        mov r7, r2
+        cal .bank2_chestDrawSlotWithHighlight
+
+        pld r1, %playerinput
+    jmp .bank2_chestHandleSelection
+
+
+
+
+
+.PAGE:
+.bank2_chestHandleSelection
+    mld r7, permanentSelectedSlot
+    cal .bank2_chestDrawSlotWithHighlight
+
+    pld r1, %playerinput
+    brt zero, .bank2_chestSkipSelectItem
+
+    mld r1, permanentSelectedSlot
+    mld r2, inventorySlot
+    cmp r1, 0xFF
+    brt nzero, .bank2_chestSelectedAlready
+        cmp r2, 0x70
+        brt grtreq, .bank2_chestSkipSelectItem
+        mst r2, permanentSelectedSlot
+        jmp .bank2_chestSkipSelectItem
+    
+    .bank2_chestSelectedAlready
+    mov r7, r1
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mld r3, 0
+    mov r7, r2
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mld r4, 0
+    poi r7
+    mst r3, 0
+    psh r4
+    mov r7, r2
+    cal .bank2_chestDrawSlotWithHighlight
+    pop r4
+    mld r1, permanentSelectedSlot
+    mov r7, r1
+    cal .bank2_inventoryGetSlot
+    poi r7
+    mst r4, 0
+    mov r7, r1
+    cal .bank2_chestDrawSlotWithoutHighlight
+    lim r0, 0xFF
+    mst r0, permanentSelectedSlot
+    mld r7, inventorySlot
+    cal .bank2_chestDrawSlotWithHighlight
+
+    .bank2_chestSkipSelectItem
+    pld r0, %screen_buffer
+jmp .bank2_chestLoop
+
+.checkBlockAbove
+    adi r2, r2, 1
+    pst r2, %blockram_y
+    adi r2, r2, -1
+    pld r6, %blockram_id
+    pst r2, %blockram_y
+    cmp r6, BLOCK_AIR
+    brt zero, ~+7
+    cmp r6, BLOCK_LEAVES
+    brt zero, ~+5
+    cmp r6, BLOCK_GLASS
+    brt zero, ~+3
+    cmp r6, BLOCK_SAPLING
+    brt nzero, ~+3
+    lim r7, 0
+ret
+    lim r7, 1
+ret
+
+
+
+
+// MISC
+
+
+
+
+
+.PAGE:
+.bank2_drawGameOverScreen
+    pld r0, %screen_clearscreen
+
+    lim r1, TEXTURE_GAMEOVER
+
+    // You died!
+        lim r0, 11
+        pst r0, %screen_y1
+        lim r2, 27
+            pst r2, %screen_x1
+            pst r1, %screen_texid_drawtex
+            adi r1, r1, 1
+            adi r2, r2, 8
+            cmp r2, 67
+            brt lesseq, ~-5
+        pld r0, %screen_nop
+    
+    // Score: 69
+        lim r0, 22
+        pst r0, %screen_y1
+        lim r2, 33
+            pst r2, %screen_x1
+            pst r1, %screen_texid_drawtex
+            adi r1, r1, 1
+            adi r2, r2, 8
+            cmp r2, 57
+            brt lesseq, ~-5
+        pld r0, %screen_nop
+
+    // Respawn button
+        lim r0, 12
+        pst r0, %screen_x1
+        lim r0, 34
+        pst r0, %screen_y1
+        lim r0, 83
+        pst r0, %screen_x2
+        lim r0, 46
+        pst r0, %screen_y2_drawrect
+
+        lim r0, 13
+        pst r0, %screen_x1
+        lim r0, 35
+        pst r0, %screen_y1
+        lim r0, 82
+        pst r0, %screen_x2
+        lim r0, 45
+        pst r0, %screen_y2_clearrect
+
+    // Respawn
+        lim r0, 22
+        pst r0, %screen_y1
+        lim r2, 31
+            pst r2, %screen_x1
+            pst r1, %screen_texid_drawtex
+            adi r1, r1, 1
+            adi r2, r2, 8
+            cmp r2, 63
+            brt lesseq, ~-5
+        pld r0, %screen_nop
+
+    pld r0, %screen_buffer
+
+    mld r1, x
+    aim r1, 0b11110000
+    adi r1, r1, 3
+    mst r1, x
+
+    mld r3, z
+    aim r3, 0b11110000
+    adi r3, r3, 3
+    mst r3, x
+
+jmp .respawn
+
+
+
+
+
+
+
+.PAGE:
+.respawn
+    mld r2, y
+    bsri r2, r2, 4
+    bsri r1, r1, 4
+    pst r1, %blockram_x
+    bsri r3, r3, 4
+    pst r3, %blockram_z
+    pld r0, %blockram_oobinactive
+
+    .respawnPositionLoop
+        pst r2, %blockram_y
+        adi r2, r2, 1
+        pld r4, %blockram_id
+        brt zero, ~+3
+        cmp r4, BLOCK_SAPLING
+        brt nzero, .respawnPositionLoop
+        pst r2, %blockram_y
+        pld r4, %blockram_id
+        brt zero, ~+3
+        cmp r4, BLOCK_SAPLING
+        brt nzero, .respawnPositionLoop
+    
+    bsli r2, r2, 4
+    mst r2, y
+    pst r0, %playerinput
+    nop
+    pld r0, %playerinput
+
+    pld r0, %switchbanks
+jmp .continueFromClosingInventory
+
+
+
+.doRandomTicks
+    lim r5, RANDOMTICKSPEED
+    .randomTickLoop
+        pld r1, %rng
+        aim r1, 0x07
+        pld r2, %rng
+        aim r2, 0x07
+        pld r3, %rng
+        aim r3, 0x07
+
+        pst r1, %blockram_x
+        pst r2, %blockram_y
+        pst r3, %blockram_z
+        pld r4, %blockram_id
+
+        cmp r4, BLOCK_DIRT
+        brt nzero, .randomTickNotDirt
+            jmp .randomTickDirt
+        .randomTickNotDirt
+
+        pld r4, %blockram_id
+        cmp r4, BLOCK_GRASS
+        brt nzero, .randomTickNotGrass
+            cal .checkBlockAbove
+            brt zero, ~+4
+                lim r7, BLOCK_DIRT
+                pst r7, %blockram_id
+                mst r7, needReRender
+            jmp .randomTickLoopContinue
+        .randomTickNotGrass
+
+        cmp r4, BLOCK_LEAVES
+        brt nzero, .randomTickNotLeaves
+            mld r7, logsInWorld
+            brt zero, ~+4
+                jmp .randomTickLeaves
+            jmp .randomTickLoopContinue
+        .randomTickNotLeaves
+
+        cmp r4, BLOCK_SAPLING
+        brt nzero, .randomTickLoopContinue
+            jmp .growTree
+        
+        .randomTickLoopContinue
+        adi r5, r5, -1
+    brt nzero, .randomTickLoop
+    pld r0, %switchbanks
+ret
+
+
+
+
+
+
+.PAGE:
+.randomTickDirt
+    cal .checkBlockAbove
+    brt zero, ~+2
+    jmp .randomTickLoopContinue
+        psh r5
+        adi r1, r1, 1
+        adi r2, r2, 1
+        adi r3, r3, 1
+
+        adi r5, r1, -3
+        .grassSpreadingLoopX
+            adi r5, r5, 1
+            pst r5, %blockram_x
+            adi r6, r2, -3
+            .grassSpreadingLoopY
+                adi r6, r6, 1
+                pst r6, %blockram_y
+                adi r7, r3, -3
+                .grassSpreadingLoopZ
+                    adi r7, r7, 1
+                    pst r7, %blockram_z
+                    pld r4, %blockram_id
+                    cmp r4, BLOCK_GRASS
+                    brt zero, .grassSpreadingFoundGrass
+                sub r0, r7, r3
+                brt nzero, .grassSpreadingLoopZ
+            sub r0, r6, r2
+            brt nzero, .grassSpreadingLoopY
+        sub r0, r5, r1
+        brt nzero, .grassSpreadingLoopX
+    
+    pop r5
+    adi r1, r1, -1
+    adi r2, r2, -1
+    adi r3, r3, -1
+    jmp .randomTickLoopContinue
+
+    .grassSpreadingFoundGrass
+    pop r5
+    adi r1, r1, -1
+    adi r2, r2, -1
+    adi r3, r3, -1
+    pst r1, %blockram_x
+    pst r2, %blockram_y
+    pst r3, %blockram_z
+    lim r0, BLOCK_GRASS
+    pst r0, %blockram_id
+    lim r0, 255
+    mst r0, needReRender
+    jmp .randomTickLoopContinue
+
+.growTree
+    pld r4, %rng
+    aim r4, 1
+
+    psh r4
+    psh r5
+    adi r1, r1, 2
+    adi r3, r3, 2
+    adi r4, r4, 2
+    add r2, r2, r4
+
+    adi r5, r1, -5
+jmp .treeBottomLoopX
+
+.finishGrowTree
+    adi r4, r4, 1
+    mst r4, logsInWorld
+    mst r4, needReRender
+jmp .randomTickLoopContinue
+
+
+
+
+
+.PAGE:
+    .treeBottomLoopX
+        adi r5, r5, 1
+        pst r5, %blockram_x
+        adi r6, r2, -2
+        .treeBottomLoopY
+            adi r6, r6, 1
+            pst r6, %blockram_y
+            adi r7, r3, -5
+            .treeBottomLoopZ
+                adi r7, r7, 1
+                pst r7, %blockram_z
+                pld r4, %blockram_id
+                brt nzero, ~+3
+                    lim r0, BLOCK_LEAVES
+                    pst r0, %blockram_id
+            sub r0, r7, r3
+            brt nzero, .treeBottomLoopZ
+        sub r0, r6, r2
+        brt nzero, .treeBottomLoopY
+    sub r0, r5, r1
+    brt nzero, .treeBottomLoopX
+
+    adi r1, r1, -1
+    adi r3, r3, -1
+    adi r2, r2, 2
+
+    adi r5, r1, -3
+    .treeTopLoopX
+        adi r5, r5, 1
+        pst r5, %blockram_x
+        adi r6, r2, -2
+        .treeTopLoopY
+            adi r6, r6, 1
+            pst r6, %blockram_y
+            adi r7, r3, -3
+            .treeTopLoopZ
+                adi r7, r7, 1
+                pst r7, %blockram_z
+                pld r4, %blockram_id
+                brt nzero, ~+3
+                    lim r0, BLOCK_LEAVES
+                    pst r0, %blockram_id
+            sub r0, r7, r3
+            brt nzero, .treeTopLoopZ
+        sub r0, r6, r2
+        brt nzero, .treeTopLoopY
+    sub r0, r5, r1
+    brt nzero, .treeTopLoopX
+
+    pop r5
+    pop r4
+    adi r1, r1, -1
+    adi r3, r3, -1
+    adi r7, r2, -4
+    sub r7, r7, r4
+    pst r1, %blockram_x
+    pst r3, %blockram_z
+    mld r4, logsInWorld
+
+    .treeTrunkLoop
+        adi r2, r2, -1
+        pst r2, %blockram_y
+        pld r6, %blockram_id
+        brt zero, ~+3
+        cmp r6, BLOCK_LEAVES
+        brt nzero, ~+4
+            lim r0, BLOCK_LOG
+            pst r0, %blockram_id
+            adi r4, r4, 1
+    sub r0, r2, r7
+    brt nzero, .treeTrunkLoop
+    lim r0, BLOCK_LOG
+    pst r0, %blockram_id
+jmp .finishGrowTree
+
+

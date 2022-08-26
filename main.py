@@ -22,9 +22,9 @@ if __name__ == "__main__":
     with open("chasm_scripts/bank2.s", "r") as f:
         for line in f:
             lines.append(line.strip())
-    print(lines)
     lines = [Instruction(line, index) for index, line in enumerate(lines)]
     lines = preprocess.preprocess(lines)
+    #print([e.text for e in lines])
     if True:
         lines = lines[0:2048]  # bank 1
         lines = translate.translate(lines)
