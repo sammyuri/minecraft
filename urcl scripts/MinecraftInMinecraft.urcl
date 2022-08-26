@@ -1158,6 +1158,10 @@ lstr inventory 4 0xFE
 
                 // drop item
                 psh r5
+                mov r4 r2
+                bsl r2 r1 4
+                or r3 r3 r2
+
                 in r1 %rng
                 bge ~+4 r1 LEAVES_SAPLING_PROBABILITY
                     imm r5 ENTITY_SAPLING
