@@ -87,7 +87,7 @@ export class CraftingRom {
 }
 var Station;
 (function (Station) {
-    Station[Station["table"] = 253] = "table";
+    Station[Station["table"] = 255] = "table";
     Station[Station["furnace"] = 254] = "furnace";
 })(Station || (Station = {}));
 var Ingredient;

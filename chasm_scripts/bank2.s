@@ -1904,7 +1904,7 @@ jmp .continueFromClosingInventory
         cmp r4, BLOCK_LEAVES
         brt nzero, .randomTickNotLeaves
             mld r7, logsInWorld
-            brt zero, ~+4
+            brt zero, ~+2
                 jmp .randomTickLeaves
             jmp .randomTickLoopContinue
         .randomTickNotLeaves

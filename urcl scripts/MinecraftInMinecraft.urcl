@@ -349,15 +349,15 @@ lstr inventory 4 0xFE
                             cal .createEntity
                             jmp .endDropItem
                         in r1 %rng
-                        bge ~+4 r1 50 // 50/256 chance of dropping sapling
+                        bge ~+4 r1 LEAVES_SAPLING_PROBABILITY
                             imm r5 ENTITY_SAPLING
                             cal .createEntity
                             jmp .endDropItem
-                        bge ~+4 r1 70 // 20/256 chance of dropping stick
+                        bge ~+4 r1 LEAVES_STICK_PROBABILITY
                             imm r5 ENTITY_STICK
                             cal .createEntity
                             jmp .endDropItem
-                        brg ~+3 r1 80 // 10/256 chance of dropping apple
+                        brg ~+3 r1 LEAVES_APPLE_PROBABILITY
                             imm r5 ENTITY_APPLE
                             cal .createEntity
                     //jmp .endDropItem
@@ -1153,7 +1153,7 @@ lstr inventory 4 0xFE
         .randomTickNotGrass
         bne .randomTickNotLeaves r4 BLOCK_LEAVES
             lod r7 logsInWorld  // only decay leaves when there are no logs in world
-            bnz ~+17 r7
+            bnz ~+20 r7
                 out %blockram_id r0
 
                 // drop item
