@@ -61,8 +61,8 @@ export class CraftingRom implements Device {
                 }
             } else {
                 this.currentRecipe = this.currentRecipe.toLocaleUpperCase();
-                if (this.currentRecipe in this.recipes) {
-                    return this.recipes[this.currentRecipe];
+                if (this.currentRecipe[8] in this.recipes) {
+                    return this.recipes[this.currentRecipe[8]];
                 } else {
                     return 0;
                 }

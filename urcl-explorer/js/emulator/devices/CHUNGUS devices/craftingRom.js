@@ -58,9 +58,7 @@ export class CraftingRom {
                 }
                 else {
                     this.currentRecipe = this.currentRecipe.toLocaleUpperCase();
-                    console.log(this.currentRecipe[8]);
                     if (this.currentRecipe[8] in this.recipes) {
-                        console.log(this.recipes[this.currentRecipe[8]])
                         return this.recipes[this.currentRecipe[8]];
                     }
                     else {
