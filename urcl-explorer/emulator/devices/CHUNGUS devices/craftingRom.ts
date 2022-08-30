@@ -7,6 +7,7 @@ export class CraftingRom implements Device {
          ["4"]: Result.stone,
          ["5"]: Result.coal,
          ["9"]: Result.ironIngot,
+         ["A"]: Result.glass,
 
          //crafting recipes
          ["770770000"]: Result.table,
@@ -131,4 +132,5 @@ enum Result {
     ironShovel = 0xFA,
     ironSword = 0xFB,
     shears = 0xFC,
+    glass = 0xB1,
 }

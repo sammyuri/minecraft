@@ -3045,22 +3045,12 @@ ret
                     jmp ~+2
                 add r2 r2 1
 
-        .bank2_inventorySkipMovement 
+        .bank2_inventorySkipMovement
             str inventorySlot r2  // draw selected slot
             mov r7 r2
             cal .bank2_inventoryDrawSlotWithHighlight
 
-            //TODO: old code: //in r1 %playerinput  // craft?
-            // brz .bank2_inventorySkipTryCrafting r1  // skip if not necessary
-            // lod r1 craftingOutput
-            // brz .bank2_inventorySkipTryCrafting r1  // skip if no crafting output
-
-            // cal .bank2_tryCrafting  // try and craft
-            // lod r7 inventorySlot  // redraw inventory slot (incase modified)
-            // cal .bank2_inventoryDrawSlotWithHighlight
-
-        //.bank2_inventorySkipTryCrafting
-            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any) 
+            lod r7 permanentSelectedSlot // highlight permanent selected slot (if any) 
             cal .bank2_inventoryDrawSlotWithHighlight
 
             in r1 %playerinput // select item single ?
@@ -3130,7 +3120,7 @@ ret
 
                 jmp .bank2_inventoryCheckCrafting
 
-            .bank2_inventorySkipSelectSingleItem
+            .bank2_inventorySkipSelectSingleItem //mark1
             in r1 %playerinput // select item stack ?
             brz .bank2_inventoryContinue r1  // skip if not necessary
 
@@ -4174,46 +4164,116 @@ ret
             mov r7 r2
             cal .bank2_chestDrawSlotWithHighlight
 
-            in r1 %playerinput  // craft? (unnecessary)
-
-            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
+            lod r7 permanentSelectedSlot // highlight permanent selected slot (if any)
             cal .bank2_chestDrawSlotWithHighlight
 
-            in r1 %playerinput  // select item?
-            brz .bank2_chestSkipSelectItem r1  // skip if not necessary
+            in r1 %playerinput // select item single ?
 
-            lod r1 permanentSelectedSlot  // get current permanent slot
-            lod r2 inventorySlot
-            bne .bank2_chestSelectedAlready r1 0xFF  // already selected
-                // select new slot
-                bge .bank2_chestSkipSelectItem r2 0x70  // out of bounds - do not select
-                str permanentSelectedSlot r2  // set new permanent slot
-                // NOTE: slot already highlighted (in previous section)
-                jmp .bank2_chestSkipSelectItem
-            
-            .bank2_chestSelectedAlready
-            // slot already selected
-            mov r7 r1  // get memory address of old slot
-            cal .bank2_inventoryGetSlot
-            lod r3 r7
-            mov r7 r2  // get memory address of new slot
-            cal .bank2_inventoryGetSlot
-            lod r4 r7
-            str r7 r3  // move item(s) over
-            psh r4  // preserve items
-            mov r7 r2
-            cal .bank2_chestDrawSlotWithHighlight
-            pop r4
-            lod r1 permanentSelectedSlot
-            mov r7 r1  // get memory address of old slot
-            cal .bank2_inventoryGetSlot
-            str r7 r4  // swap items the other way
-            mov r7 r1  // redraw and remove highlight
-            cal .bank2_chestDrawSlotWithoutHighlight
-            str permanentSelectedSlot 0xFF  // remove permanent selected slot
-            lod r7 inventorySlot  // redraw slot if needed
-            cal .bank2_chestDrawSlotWithHighlight
-    .bank2_chestSkipSelectItem
+                brz .bank2_chestSkipSelectSingleItem r1
+
+                lod r1 permanentSelectedSlot
+                lod r2 inventorySlot
+
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_chestContinue
+
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                lod r3 r7 //r3 = old slot contents
+                mov r7 r2  // get memory address of new slot
+                cal .bank2_inventoryGetSlot
+                lod r4 r7 //r4 = new slot contents
+
+                bne ~+3 r1 r2 //if old and new slots are the same, remove old slot
+                    str permanentSelectedSlot 0xFF
+                    jmp .bank2_chestContinue
+                bnz ~+3 r3 //if old slot is empty, there is nothing to move.
+                    str permanentSelectedSlot 0xFF //remove permanent selected slot
+                    jmp .bank2_chestContinue
+                bge .bank2_chestContinue r4 0xF0 //if new slot is nonstackable, can't put anything in it.
+
+                brl ~+3 r3 0xF0
+                    //if old slot is nonstackable:
+                    bnz .bank2_chestContinue r4 //if trying to put nonstackable in occupied slot, don't.
+                    jmp .bank2_chestSwapStackPositions
+                
+                and r5 r3 0xF0
+                and r6 r4 0xF0
+
+                bnz ~+3 r4 
+                    //if new slot is empty, set it's type to match old slot
+                    imm r4 r5
+                    jmp ~+4
+
+                bne .bank2_chestContinue r5 r6 //if item types don't match, can't stack.
+                    and r6 r4 0x0F
+                    bre .bank2_chestContinue r6 15 //if stack size is already 15, can't stack
+                    inc r6 r4
+                    str r7 r6 //add one to new stack
+                    dec r3 r3
+                    psh r3
+                        mov r7 r1
+                        cal .bank2_inventoryGetSlot
+                    pop r3
+                    and r5 r3 0x0F
+                    bnz ~+3 r5
+                        mov r3 r0
+                        str permanentSelectedSlot 0xFF
+                    str r7 r3 //reduce old stack by one.
+
+                    mov r7 r1
+                    lod r6 permanentSelectedSlot
+                    bne ~+3 r6 0xFF
+                        cal .bank2_chestDrawSlotWithoutHighlight
+                    jmp ~+2
+                        cal .bank2_chestDrawSlotWithHighlight
+
+                    lod r7 inventorySlot
+                    cal .bank2_chestDrawSlotWithHighlight
+
+                jmp .bank2_chestContinue
+
+            .bank2_chestSkipSelectSingleItem //mark2
+            in r1 %playerinput  // select item stack ?
+            brz .bank2_chestContinue r1  // skip if not necessary
+
+                lod r1 permanentSelectedSlot  // get current permanent slot
+                lod r2 inventorySlot
+
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_chestContinue
+                
+                // slot already selected 
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                lod r3 r7 //r3 = old slot contents
+                mov r7 r2  // get memory address of new slot
+                cal .bank2_inventoryGetSlot
+                lod r4 r7 //r4 = new slot contents
+                
+                .bank2_chestSwapStackPositions
+                    str r7 r3 //store old slot contents into new slot
+                    psh r4  // preserve items
+                        psh r1
+                            mov r7 r2
+                            cal .bank2_chestDrawSlotWithHighlight
+                        pop r1
+                    pop r4
+
+                    mov r7 r1
+                    cal .bank2_inventoryGetSlot
+                    str r7 r4 //store new slot contents into old slot
+
+                    mov r7 r1
+                    cal .bank2_chestDrawSlotWithoutHighlight
+                    str permanentSelectedSlot 0xFF  // remove permanent selected slot
+
+                    lod r7 inventorySlot  // redraw slot if needed
+                    cal .bank2_chestDrawSlotWithHighlight
+
+    .bank2_chestContinue
     // render and wait for inputs
     in r0 %screen_buffer
     jmp .bank2_chestLoop
