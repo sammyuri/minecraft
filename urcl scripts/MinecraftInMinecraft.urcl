@@ -29,7 +29,7 @@ minstack 23
         @define MINFALLDAMAGESPEED 32
         @define FALLDAMAGESCALING 0b00_001000
         @define RANDOMTICKSPEED 10 //TEMP: 10 is too high. At this speed each block has 1/51 chance of being ticked every frame
-        @define SMELTTIME 0xC0  // this was set to something ridiculous?
+        @define SMELTTIME 0xC0 //NOTE: value stored in upper 4 bits only. 12 (0xC) is conveniet because it's equal to the length of the arrow.
         @define LEAVES_SAPLING_PROBABILITY 50  // 50/256
         @define LEAVES_STICK_PROBABILITY 70  // 20/256
         @define LEAVES_APPLE_PROBABILITY 80  // 10/256
@@ -365,13 +365,13 @@ lstr inventory 4 0xFD
                 psh r1
                 psh r2
                 // check if tile entity
-                    mov r7, r4
-                    mov r6, r3
+                    mov r7 r4
+                    mov r6 r3
                     cal .findBlockEntity
                     brz ~+2 r1  // reset if found (set first byte to 0)
                         str r1 0
-                    mov r4, r7
-                    mov r3, r6
+                    mov r4 r7
+                    mov r3 r6
                 pop r2
                 pop r1
 
@@ -405,8 +405,8 @@ lstr inventory 4 0xFD
                     bre .bank2_loadCraftingGUI r5 BLOCK_TABLE  // crafting
 
                     // find targeted block entity
-                    mov r7, r4
-                    mov r6, r3
+                    mov r7 r4
+                    mov r6 r3
                     cal .findBlockEntity
                     brz .endUseTargetedBlock r1  // no match
                     str loadedTileEntity r1
@@ -2374,6 +2374,11 @@ ret
         sub r6 18 r6  // y
         add r5 r5 21  // x
         ret
+    bne ~+5 r7 0x52 //small grid crafting output slot
+        imm r7 craftingOutput
+        imm r5 60 //x
+        imm r6 14 //y
+        ret
     bge ~+11 r7 0x70  // within small crafting grid
         sub r6 6 r6
         mlt r7 r6 3  // memory address
@@ -2387,7 +2392,7 @@ ret
         ret
     bne ~+5 r7 0x83 //large grid crafting output slot
         imm r7 craftingOutput
-        imm r5 65 //x //TODO: check if this is the correct location
+        imm r5 65 //x
         imm r6 10 //y
         ret
     bge ~+11 r7 0xA0  // within large crafting grid
@@ -2400,6 +2405,12 @@ ret
         mlt r6 r6 9
         sub r6 19 r6  // y
         add r5 r5 21  // x
+        ret
+    bne ~+6 r7 0xA1 //furnace output slot
+        imm r5 56 //x
+        imm r6 10 //y
+        lod r7 loadedTileEntity
+        add r7 r7 4
         ret
     bge ~+6 r7 0xB0  // furnace bottom slot
         imm r5 30
@@ -2633,7 +2644,7 @@ ret
             out %screen_texid_drawtex r4
         pop r4
 
-        //item count //TODO: check if this works
+        //item count
         and r3 r3 0x0F  // get item count
         add r3 r3 TEXTURE_NUMBER  // get background texture
         add r1 r1 1  // move x,y over to correct position
@@ -2819,73 +2830,6 @@ ret
     brl .bank2_doCraftingUseItemsLoop r7 craftingOutput
 ret
 
-// try crafting - same subroutine for both 2x2 and 3x3 grids
-.bank2_tryCrafting //TODO: redo all of this code
-    imm r1 15  // push entire inventory to stack - in case of not enough materials
-    imm r2 inventory
-    .bank2_tryCraftingToStackLoop
-        lod r3 r2
-        psh r3
-        add r2 r2 1
-        sub r1 r1 1
-        bnz .bank2_tryCraftingToStackLoop r1
-
-    imm r1 0  // index in crafting grid
-    .bank2_tryCraftingMainLoop
-        add r2 r1 craftingGrid  // get item id
-        lod r2 r2
-        and r2 r2 0xF0
-        brz .bank2_tryCraftingLoopContinue r2  // continue if no item in that slot
-        imm r3 0  // index in inventory
-        .bank2_tryCraftingSubLoop
-            add r4 r3 inventory  // get inventory item id
-            lod r4 r4
-            and r5 r4 0xF0  // check if same item id
-            bre .bank2_tryCraftingLoopItemMatch r2 r5  // match!
-            add r3 r3 1  // no match - continue
-            brl .bank2_tryCraftingSubLoop r3 15  // if more inventory left, continue
-        jmp .bank2_tryCraftingFailure  // no items of this id remain in inventory
-
-        .bank2_tryCraftingLoopItemMatch
-        sub r4 r4 1  // subtract 1 from item count
-        and r5 r4 0x0F  // check if no items left in stack
-        bnz ~+2 r5
-            mov r4 r0  // reset stack if no items left
-        add r3 r3 inventory  // store item back
-        str r3 r4
-        .bank2_tryCraftingLoopContinue
-        add r1 r1 1  // move along to next slot in crafting grid
-        brl .bank2_tryCraftingMainLoop r1 9  // continue if not done all slots
-
-    // success
-        lod r7 craftingOutput  // add crafting output to inventory
-        cal .bank2_addItemToInventory
-
-        brz .bank2_tryCraftingFailure r7
-
-        imm r1 15  // pop the (garbage) inventory off the stack
-        .bank2_tryCraftingClearStackLoop
-            pop r0
-            sub r1 r1 1
-        bnz .bank2_tryCraftingClearStackLoop r1
-
-        str permanentSelectedSlot 0xFF  // reset permanent selected slot if successful
-        cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
-    ret
-
-    // failure
-    .bank2_tryCraftingFailure
-        imm r2 inventory  // pop entire inventory from stack
-        add r2 r2 14
-        .bank2_tryCraftingFromStackLoop
-            pop r3
-            str r2 r3
-            sub r2 r2 1
-        bge .bank2_tryCraftingFromStackLoop r2 inventory
-    ret
-
-
-
 
 // PLAYER INVENTORY (2x2 crafting grid)
 
@@ -2935,9 +2879,13 @@ ret
 .bank2_reset2x2CraftingGrid
     imm r1 craftingGrid  // memory address
     .bank2_reset2x2CraftingGridLoop  // can use loop counter on chungus
+        lod r7 r1
+        psh r1
+            cal .bank2_addItemToInventory
+        pop r1
         str r1 0  // store empty item
         inc r1 r1
-        ble .bank2_reset2x2CraftingGridLoop r1 craftingOutput  // loop if not done
+    ble .bank2_reset2x2CraftingGridLoop r1 craftingOutput  // loop if not done
 
     // draw background of grid
     out %screen_x1 26
@@ -2947,8 +2895,8 @@ ret
 
     // draw items in grid
     imm r7 craftingGrid  // memory address
-    imm r2 9  // y
 
+    imm r2 9  // y
     imm r1 26  // x
     imm r5 2  // length
     mov r6 r7  // memory address
@@ -2964,8 +2912,10 @@ ret
     imm r1 60  // x
     imm r2 14  // y
     imm r3 0  // no item
-    imm r4 1  // not highlighted
+    imm r4 1 // not selected
     cal .bank2_drawItem
+    imm r3 0
+    cal .bank2_drawItemInGrid
 ret
 
 
@@ -3015,17 +2965,32 @@ ret
         in r1 %playerinput //is open/close inventory pressed?
         bnz .continueFromClosingInventory r1
         
-    // handle inventory movement
+    // handle inventory movement 
         in r1 %playerinput  // inventory movement
         lod r2 inventorySlot
         brz .bank2_inventorySkipMovement r1  // skip if no movement
 
         lod r7 inventorySlot
         psh r1
-        cal .bank2_inventoryDrawSlotWithoutHighlight  // remove highlight from previous slot
+            cal .bank2_inventoryDrawSlotWithoutHighlight  // remove highlight from previous slot
         pop r1
 
         lod r2 inventorySlot
+        bne .bank2_inventorySkipMoveFromOutput r2 0x52
+
+            //move from crafting output
+            bne ~+2 r1 0x10 //move up
+                imm r2 0x04
+            bne ~+2 r1 0xF0 //move down
+                imm r2 0x24
+            bne ~+2 r1 0x0F //move left
+                imm r2 0x51
+            bne ~+2 r1 0x01 //move right
+                imm r2 0x50
+            
+            jmp .bank2_inventorySkipMovement
+        
+        .bank2_inventorySkipMoveFromOutput 
         brl .bank2_inventoryMoveWithinInventory r2 0x30
 
             // moving within crafting grid
@@ -3039,12 +3004,18 @@ ret
                     imm r2 0x20  // move to top of inventory
                     jmp ~+2
                 add r2 r2 r1
-            bne ~+3 r1 0x0F  // move left
+            bne ~+6 r1 0x0F  // move left
+                and r3 r2 0x0F
+                bne ~+3 r3 0x00  // left of crafting grid
+                    imm r2 0x52  // move to output
+                    jmp ~+2
                 sub r2 r2 1
-                and r2 r2 0xF1  // stay within grid
-            bne ~+3 r1 0x01  // move right
+            bne ~+6 r1 0x01  // move right
+                and r3 r2 0x0F
+                bne ~+3 r3 0x01  // right of crafting grid
+                    imm r2 0x52  // move to output
+                    jmp ~+2
                 add r2 r2 1
-                and r2 r2 0xF1  // stay within grid
 
             jmp .bank2_inventorySkipMovement
 
@@ -3074,96 +3045,170 @@ ret
                     jmp ~+2
                 add r2 r2 1
 
-        .bank2_inventorySkipMovement
+        .bank2_inventorySkipMovement 
             str inventorySlot r2  // draw selected slot
             mov r7 r2
             cal .bank2_inventoryDrawSlotWithHighlight
 
-            in r1 %playerinput  // craft? //TODO: get rid of craft button
-            brz .bank2_inventorySkipTryCrafting r1  // skip if not necessary
-            lod r1 craftingOutput
-            brz .bank2_inventorySkipTryCrafting r1  // skip if no crafting output
+            //TODO: old code: //in r1 %playerinput  // craft?
+            // brz .bank2_inventorySkipTryCrafting r1  // skip if not necessary
+            // lod r1 craftingOutput
+            // brz .bank2_inventorySkipTryCrafting r1  // skip if no crafting output
 
-            cal .bank2_tryCrafting  // try and craft
-            lod r7 inventorySlot  // redraw inventory slot (incase modified)
+            // cal .bank2_tryCrafting  // try and craft
+            // lod r7 inventorySlot  // redraw inventory slot (incase modified)
+            // cal .bank2_inventoryDrawSlotWithHighlight
+
+        //.bank2_inventorySkipTryCrafting
+            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any) 
             cal .bank2_inventoryDrawSlotWithHighlight
 
-        .bank2_inventorySkipTryCrafting
-            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
-            cal .bank2_inventoryDrawSlotWithHighlight
+            in r1 %playerinput // select item single ?
+            brz .bank2_inventorySkipSelectSingleItem r1
 
-            in r1 %playerinput  // select item?
-            brz .bank2_inventorySkipSelectItem r1  // skip if not necessary
+                lod r1 permanentSelectedSlot
+                lod r2 inventorySlot
+                bre .bank2_inventoryTryCrafting r2 0x52
+
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_inventoryContinue
+
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                lod r3 r7 //r3 = old slot contents
+                mov r7 r2  // get memory address of new slot
+                cal .bank2_inventoryGetSlot
+                lod r4 r7 //r4 = new slot contents
+
+                bne ~+3 r1 r2 //if old and new slots are the same, remove old slot
+                    str permanentSelectedSlot 0xFF
+                    jmp .bank2_inventoryContinue
+                bnz ~+3 r3 //if old slot is empty, there is nothing to move.
+                    str permanentSelectedSlot 0xFF //remove permanent selected slot
+                    jmp .bank2_inventoryContinue
+                bge .bank2_inventoryContinue r4 0xF0 //if new slot is nonstackable, can't put anything in it.
+
+                brl ~+3 r3 0xF0
+                    //if old slot is nonstackable:
+                    bnz .bank2_inventoryContinue r4 //if trying to put nonstackable in occupied slot, don't.
+                    jmp .bank2_inventorySwapStackPositions
+                
+                and r5 r3 0xF0
+                and r6 r4 0xF0
+
+                bnz ~+3 r4 
+                    //if new slot is empty, set it's type to match old slot
+                    imm r4 r5
+                    jmp ~+4
+
+                bne .bank2_inventoryContinue r5 r6 //if item types don't match, can't stack.
+                    and r6 r4 0x0F
+                    bre .bank2_inventoryContinue r6 15 //if stack size is already 15, can't stack
+                    inc r6 r4
+                    str r7 r6 //add one to new stack
+                    dec r3 r3
+                    psh r3
+                        mov r7 r1
+                        cal .bank2_inventoryGetSlot
+                    pop r3
+                    and r5 r3 0x0F
+                    bnz ~+3 r5
+                        mov r3 r0
+                        str permanentSelectedSlot 0xFF
+                    str r7 r3 //reduce old stack by one.
+
+                    mov r7 r1
+                    lod r6 permanentSelectedSlot
+                    bne ~+3 r6 0xFF
+                        cal .bank2_inventoryDrawSlotWithoutHighlight
+                    jmp ~+2
+                        cal .bank2_inventoryDrawSlotWithHighlight
+
+                    lod r7 inventorySlot
+                    cal .bank2_inventoryDrawSlotWithHighlight
+
+                jmp .bank2_inventoryCheckCrafting
+
+            .bank2_inventorySkipSelectSingleItem
+            in r1 %playerinput // select item stack ?
+            brz .bank2_inventoryContinue r1  // skip if not necessary
 
                 lod r1 permanentSelectedSlot  // get current permanent slot
                 lod r2 inventorySlot
-                bne .bank2_inventorySelectedAlready r1 0xFF  // already selected
-                    // select new slot
-                    //TODO: the following code is being tentatively removed: bge .bank2_inventorySkipSelectItem r2 0x50  // out of bounds - do not select
-                    str permanentSelectedSlot r2  // set new permanent slot
-                    // NOTE: slot already highlighted (in previous section)
-                    jmp .bank2_inventorySkipSelectItem
+                bne .bank2_inventorySkipTryCrafting r2 0x52 //if selecting crafting output slot, do crafting
+                    .bank2_inventoryTryCrafting
+                    cal .bank2_doCrafting
+
+                    // draw items in grid
+                        imm r7 craftingGrid  // memory address
+
+                        imm r2 9  // y
+                        imm r1 26  // x
+                        imm r5 2  // length
+                        mov r6 r7  // memory address
+                        cal .bank2_drawGUIRowInGrid
+
+                        imm r2 18  // y
+                        imm r1 26  // x
+                        imm r5 2  // length
+                        add r6 r7 3  // memory address
+                        cal .bank2_drawGUIRowInGrid
+
+                    cal .bank2_drawInventoryOnlyInventoryPart
+
+                    jmp .bank2_inventoryCheckCrafting
                 
-                .bank2_inventorySelectedAlready
-                // slot already selected
+                .bank2_inventorySkipTryCrafting
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_inventoryContinue
+                
+                // slot already selected 
                 mov r7 r1  // get memory address of old slot
                 cal .bank2_inventoryGetSlot
-                lod r3 r7
+                lod r3 r7 //r3 = old slot contents
                 mov r7 r2  // get memory address of new slot
                 cal .bank2_inventoryGetSlot
-                lod r4 r7
-                str r7 r3  // move item(s) over
-                psh r4  // preserve items
-                mov r7 r2
-                cal .bank2_inventoryDrawSlotWithHighlight
-                pop r4
-                lod r1 permanentSelectedSlot
-                lod r2 inventorySlot
-                bge .bank2_inventoryCheckCrafting r2 0x50  // out of bounds - only move
+                lod r4 r7 //r4 = new slot contents
+                
+                .bank2_inventorySwapStackPositions
+                    str r7 r3 //store old slot contents into new slot
+                    psh r4  // preserve items
+                        psh r1
+                            mov r7 r2
+                            cal .bank2_inventoryDrawSlotWithHighlight
+                        pop r1
+                    pop r4
 
-                    // within bounds
-                    mov r7 r1  // get memory address of old slot
+                    mov r7 r1
                     cal .bank2_inventoryGetSlot
-                    str r7 r4  // swap items the other way
-                    mov r7 r1  // redraw and remove highlight
+                    str r7 r4 //store new slot contents into old slot
+
+                    mov r7 r1
                     cal .bank2_inventoryDrawSlotWithoutHighlight
                     str permanentSelectedSlot 0xFF  // remove permanent selected slot
+
                     lod r7 inventorySlot  // redraw slot if needed
                     cal .bank2_inventoryDrawSlotWithHighlight
-                    jmp .bank2_inventorySkipSelectItem
         
-        .bank2_inventoryCheckCrafting
-            // check if a crafting recipe has been made possible
-            out %craftrom 0xFF  // set to crafting mode
-            imm r1 9  // output full crafting grid
-            imm r2 craftingGrid
-            .bank2_inventoryCheckCraftingLoop
-                lod r3 r2
-                out %craftrom r3
-                add r2 r2 1
-                sub r1 r1 1
-                bnz .bank2_inventoryCheckCraftingLoop r1
-            in r3 %craftrom  // get item (if any)
-            str craftingOutput r3  // store
-            // draw output item
-            imm r1 60  // x
-            imm r2 14  // y
-            imm r4 1  // not highlighted
-            cal .bank2_drawItem
-
-        .bank2_inventorySkipSelectItem
-
-            in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
-            in r0 %playerinput  // garbage
-
-            in r1 %playerinput  // clear crafting grid?
-            brz .bank2_inventoryContinue r1
-                cal .bank2_reset2x2CraftingGrid
-                lod r7 inventorySlot  // redraw inventory slot
-                cal .bank2_inventoryDrawSlotWithHighlight
+            .bank2_inventoryCheckCrafting
+                // check if a crafting recipe has been made possible
+                out %craftrom 0xFF  // set to crafting mode
+                imm r1 9  // output full crafting grid
+                imm r2 craftingGrid
+                .bank2_inventoryCheckCraftingLoop
+                    lod r3 r2
+                    out %craftrom r3
+                    add r2 r2 1
+                    sub r1 r1 1
+                    bnz .bank2_inventoryCheckCraftingLoop r1
+                in r3 %craftrom  // get item (if any)
+                str craftingOutput r3  // store
+                // draw output item
+                imm r1 60  // x
+                imm r2 14  // y
+                cal .bank2_drawItemInGrid
 
     .bank2_inventoryContinue
     // render and wait for inputs
@@ -3262,7 +3307,7 @@ ret
     imm r2 10  // y
     imm r3 0  // no item
     imm r4 1 // not selected
-    cal .bank2_drawItem //mark
+    cal .bank2_drawItem
     imm r3 0
     cal .bank2_drawItemInGrid
 ret
@@ -3303,7 +3348,7 @@ ret
     in r0 %wait
     out %playerinput r0 //synchronize playerInput device
 
-    //handle inputs
+    //handle inputs 
 
         in r0 %playerinput //get input
 
@@ -3321,21 +3366,19 @@ ret
         pop r1
 
         lod r2 inventorySlot
-        bne .bank2_craftingSkipMoveFromOutput r2 0x83
+        bne .bank2_craftingSkipMoveFromOutput r2 0x83 
 
             //move from crafting output
-            bne ~+3 r1 0x10 //move up
+            bne ~+2 r1 0x10 //move up
                 imm r2 0x04
-                jmp .bank2_craftingSkipMovement
-            bne ~+3 r1 0xF0 //move down
+            bne ~+2 r1 0xF0 //move down
                 imm r2 0x24
-                jmp .bank2_craftingSkipMovement
-            bne ~+3 r1 0x0F //move left
+            bne ~+2 r1 0x0F //move left
                 imm r2 0x82
-                jmp .bank2_craftingSkipMovement
-            //move right
+            bne ~+2 r1 0x01 //move right
                 imm r2 0x80
-                jmp .bank2_craftingSkipMovement
+            
+            jmp .bank2_craftingSkipMovement
 
         .bank2_craftingSkipMoveFromOutput
         brl .bank2_craftingMoveWithinInventory r2 0x30
@@ -3357,11 +3400,11 @@ ret
                     imm r2 0x83  // move to output
                     jmp ~+2
                 sub r2 r2 1
-            bne ~+6 r1 0x01  // move right
+            bne ~+6 r1 0x01 // move right 
                 and r3 r2 0x0F
                 bne ~+3 r3 0x02  // right of crafting grid
                     imm r2 0x83  // move to output
-                    jmp .bank2_craftingSkipMovement
+                    jmp ~+2
                 add r2 r2 1
 
             jmp .bank2_craftingSkipMovement
@@ -3385,7 +3428,7 @@ ret
                     add r2 r2 0x04  // move to right of inventory
                     jmp ~+2
                 sub r2 r2 1
-            bne ~+6 r1 0x01  // move right
+            bne ~+6 r1 0x01 //move right
                 and r3 r2 0x0F
                 bne ~+3 r3 0x04  // right of inventory
                     sub r2 r2 0x04  // move to left of inventory
@@ -3397,16 +3440,6 @@ ret
             mov r7 r2
             cal .bank2_craftingDrawSlotWithHighlight
 
-            //TODO: old code: //in r1 %playerinput  // craft?
-            // brz .bank2_craftingSkipTryCrafting r1  // skip if not necessary
-            // lod r1 craftingOutput
-            // brz .bank2_craftingSkipTryCrafting r1  // skip if no crafting output
-
-            // cal .bank2_tryCrafting  // try and craft
-            // lod r7 inventorySlot  // redraw inventory slot (incase modified)
-            // cal .bank2_craftingDrawSlotWithHighlight
-
-        //.bank2_craftingSkipTryCrafting
             lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
             cal .bank2_craftingDrawSlotWithHighlight
 
@@ -3585,12 +3618,6 @@ ret
     lod r3 r7  // get item
     mov r1 r5  // load x and y
     mov r2 r6
-    bge ~+4 r6 28
-        // within the furnace
-        cal .bank2_drawItemInGrid
-        cal .bank2_drawHighlight
-        ret
-    // outside the furnace
     imm r4 0  // selected item
     cal .bank2_drawItem
 ret
@@ -3605,12 +3632,6 @@ ret
     lod r3 r7  // get item
     mov r1 r5  // load x and y
     mov r2 r6
-    bge ~+4 r6 28
-        // within the furnace
-        cal .bank2_drawItemInGrid
-        cal .bank2_clearHighlight
-        ret
-    // outside the furnace
     imm r4 1  // not selected item
     cal .bank2_drawItem
 ret
@@ -3640,7 +3661,7 @@ ret
         imm r5 1
         imm r7 128
         cal .bank2_drawGUIRow
-    
+
     // draw arrow
     out %screen_x1 42  // x
     out %screen_y1 11  // y
@@ -3715,6 +3736,20 @@ ret
         pop r1
 
         lod r2 inventorySlot
+        bne .bank2_furnaceSkipMoveFromOutput r2 0xA1
+
+            //move from furnace output
+            bne ~+2 r1 0x10 //move up
+                imm r2 0x04
+            bne ~+2 r1 0xF0 //move down
+                imm r2 0x24
+            bre ~+2 r1 0x0F //move left
+            bne ~+2 r1 0x01 //move right
+                imm r2 0xA0
+
+            jmp .bank2_furnaceSkipMovement
+
+        .bank2_furnaceSkipMoveFromOutput
         brl .bank2_furnaceMoveWithinInventory r2 0x30
 
             // moving within furnace
@@ -3728,8 +3763,10 @@ ret
                     imm r2 0x20  // move to top of inventory
                     jmp ~+2
                 add r2 r2 r1
-            // note: can't move left or right within furnace GUI
-
+            bre ~+2 r1 0x0F //move left
+            bne ~+2 r1 0x01 //move right
+                imm r2 0xA1
+            
             jmp .bank2_furnaceSkipMovement
 
         .bank2_furnaceMoveWithinInventory
@@ -3751,7 +3788,7 @@ ret
                     add r2 r2 0x04  // move to right of inventory
                     jmp ~+2
                 sub r2 r2 1
-            bne ~+6 r1 0x01  // move right
+            bne ~+6 r1 0x01 // move right
                 and r3 r2 0x0F
                 bne ~+3 r3 0x04  // right of inventory
                     sub r2 r2 0x04  // move to left of inventory
@@ -3761,61 +3798,128 @@ ret
         .bank2_furnaceSkipMovement
             str inventorySlot r2  // draw selected slot
             mov r7 r2
-            cal .bank2_furnaceDrawSlotWithHighlight
 
-            lod r7 permanentSelectedSlot  // highlight permanent selected slot (if any)
-            cal .bank2_furnaceDrawSlotWithHighlight
+            in r1 %playerinput // select item single ?
+            brz .bank2_furnaceSkipSelectSingleItem r1
 
-            in r1 %playerinput  // take furnace output
-            brz .bank2_furnaceSkipTakeOutput r1
-                lod r1 loadedTileEntity
-                add r1 r1 4
-                lod r7 r1
-                psh r7
-                    psh r1
-                        cal .bank2_addItemToInventory
-                    pop r1
-                    bnz ~+2 r7
-                        str r1 r0  // delete from furnace
-                pop r7
-                lod r7 inventorySlot  // redraw inventory slot (incase modified)
-                cal .bank2_furnaceDrawSlotWithHighlight
-                cal .bank2_drawInventoryOnlyInventoryPart  // redraw inventory
-            .bank2_furnaceSkipTakeOutput
+                lod r1 permanentSelectedSlot
+                lod r2 inventorySlot
+                bre .bank2_furnaceTryPullResult r2 0xA1 //if targeting furnace output, add to inventory.
 
-            in r1 %playerinput  // select item?
-            brz .bank2_furnaceSkipSelectItem r1  // skip if not necessary
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_furnaceSkipSelectItem
 
-            lod r1 permanentSelectedSlot  // get current permanent slot
-            lod r2 inventorySlot
-            bne .bank2_furnaceSelectedAlready r1 0xFF  // already selected
-                // select new slot
-                str permanentSelectedSlot r2  // set new permanent slot
-                // NOTE: slot already highlighted (in previous section)
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                lod r3 r7 //r3 = old slot contents
+                mov r7 r2  // get memory address of new slot
+                cal .bank2_inventoryGetSlot
+                lod r4 r7 //r4 = new slot contents
+
+                bne ~+3 r1 r2 //if old and new slots are the same, remove old slot
+                    str permanentSelectedSlot 0xFF
+                    jmp .bank2_furnaceSkipSelectItem
+                bnz ~+3 r3 //if old slot is empty, there is nothing to move.
+                    str permanentSelectedSlot 0xFF //remove permanent selected slot
+                    jmp .bank2_furnaceSkipSelectItem
+                bge .bank2_furnaceSkipSelectItem r4 0xF0 //if new slot is nonstackable, can't put anything in it.
+
+                brl ~+3 r3 0xF0
+                    //if old slot is nonstackable:
+                    bnz .bank2_furnaceSkipSelectItem r4 //if trying to put nonstackable in occupied slot, don't.
+                    jmp .bank2_furnaceSwapStackPositions
+                
+                and r5 r3 0xF0
+                and r6 r4 0xF0
+
+                bnz ~+3 r4
+                    //if new slot is empty, set it's type to match old slot
+                    imm r4 r5
+                    jmp ~+4
+
+                bne .bank2_furnaceSkipSelectItem r5 r6 //if item types don't match, can't stack.
+                    and r6 r4 0x0F
+                    bre .bank2_furnaceSkipSelectItem r6 15 //if stack size is already 15, can't stack
+                    inc r6 r4
+                    str r7 r6 //add one to new stack
+                    dec r3 r3
+                    psh r3
+                        mov r7 r1
+                        cal .bank2_inventoryGetSlot
+                    pop r3
+                    and r5 r3 0x0F
+                    bnz ~+7 r5
+                        mov r3 r0
+                        str r7 r3 //reduce old stack by one.
+                        lod r7 permanentSelectedSlot
+                        cal .bank2_furnaceDrawSlotWithoutHighlight
+                        str permanentSelectedSlot 0xFF
+                    jmp ~+2
+                        str r7 r3 //reduce old stack by one.
+
                 jmp .bank2_furnaceSkipSelectItem
 
-            .bank2_furnaceSelectedAlready
+            .bank2_furnaceSkipSelectSingleItem
+            in r1 %playerinput // select item stack ?
+            brz .bank2_furnaceSkipSelectItem r1  // skip if not necessary
+
+                lod r1 permanentSelectedSlot  // get current permanent slot
+                lod r2 inventorySlot
+                bne .bank2_furnaceSkipTryPullResult r2 0xA1 //if selecting furnace output slot, pull result
+                    .bank2_furnaceTryPullResult
+                    
+                    lod r6 loadedTileEntity 
+                    add r6 r6 4
+                    lod r7 r6
+                    psh r6
+                        cal .bank2_addItemToInventory
+                    pop r6
+                    bnz ~+2 r7
+                        str r6 0
+                    psh r6
+                        cal .bank2_drawInventoryOnlyInventoryPart
+                    pop r6
+
+                    imm r1 56  // x
+                    imm r2 10  // y
+                    lod r3 r6
+                    imm r4 0
+                    cal .bank2_drawItem
+
+                    jmp .bank2_furnaceSkipSelectItem
+                
+                .bank2_furnaceSkipTryPullResult
+                bne ~+3 r1 0xFF  // already selected
+                    str permanentSelectedSlot r2  // set new permanent slot
+                    jmp .bank2_furnaceSkipSelectItem
+                
+                // slot already selected 
             // slot already selected
-            mov r7 r1  // get memory address of old slot
-            cal .bank2_inventoryGetSlot
-            lod r3 r7
-            mov r7 r2  // get memory address of new slot
-            cal .bank2_inventoryGetSlot
-            lod r4 r7
-            str r7 r3  // move item(s) over
-            psh r4  // preserve items
-            mov r7 r2
-            cal .bank2_furnaceDrawSlotWithHighlight
-            pop r4
-            lod r1 permanentSelectedSlot
-            mov r7 r1  // get memory address of old slot
-            cal .bank2_inventoryGetSlot
-            str r7 r4  // swap items the other way
-            mov r7 r1  // redraw and remove highlight
-            cal .bank2_furnaceDrawSlotWithoutHighlight
-            str permanentSelectedSlot 0xFF  // remove permanent selected slot
-            lod r7 inventorySlot  // redraw slot if needed
-            cal .bank2_furnaceDrawSlotWithHighlight
+                // slot already selected 
+            // slot already selected
+                // slot already selected 
+            // slot already selected
+                // slot already selected 
+            // slot already selected
+                // slot already selected 
+                mov r7 r1  // get memory address of old slot
+                cal .bank2_inventoryGetSlot
+                lod r3 r7 //r3 = old slot contents
+                mov r7 r2  // get memory address of new slot
+                cal .bank2_inventoryGetSlot
+                lod r4 r7 //r4 = new slot contents
+                
+                .bank2_furnaceSwapStackPositions
+                    str r7 r3 //store old slot contents into new slot
+
+                    mov r7 r1
+                    cal .bank2_inventoryGetSlot
+                    str r7 r4 //store new slot contents into old slot
+
+                    mov r7 r1
+                    cal .bank2_furnaceDrawSlotWithoutHighlight
+                    str permanentSelectedSlot 0xFF  // remove permanent selected slot
         
         .bank2_furnaceSkipSelectItem
 
@@ -3934,6 +4038,10 @@ ret
         brl .bank2_updateFurnaceLoop r1 endBlockEntities
 
             cal .bank2_drawFurnaceContents  // redraws furnace contents incase modified
+            lod r7 inventorySlot
+            cal .bank2_furnaceDrawSlotWithHighlight
+            lod r7 permanentSelectedSlot
+            cal .bank2_furnaceDrawSlotWithHighlight
 
     .bank2_furnaceContinue
     // render and wait for inputs
